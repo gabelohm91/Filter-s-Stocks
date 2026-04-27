@@ -223,20 +223,32 @@ if st.sidebar.button('🔄 Refrescar Datos'):
    st.session_state['last_update'] = datetime.now().strftime("%H:%M:%S")
 
 # --- GESTIÓN DE ACTIVOS ---
+# Se agregaron ASML, BHP, DHR, COST y NEE a tu lista de confianza
 MIS_ACTIVOS_FIJOS = [
     "VOO", "SCHD", "VGT", "VXUS", "VUG", "QQQ", "KO", "PEP", "WMT", "PG", 
     "O", "CVX", "JNJ", "MCD", "JPM", "XOM", "V", "ASML", "BHP", "ABBV", 
-    "SBUX", "LOW", "AVGO", "NEE", "TXN", "GOOG", "MSFT"
+    "SBUX", "LOW", "AVGO", "NEE", "TXN", "GOOG", "MSFT", "DHR", "COST"
 ]
 
 @st.cache_data(ttl=86400)
 def get_all_tickers():
     try:
-        url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
-        sp500 = pd.read_html(url)[0]['Symbol'].tolist()
-        sp500 = [s.replace('.', '-') for s in sp500]
-        return sorted(list(set(sp500 + MIS_ACTIVOS_FIJOS)))
-    except: return MIS_ACTIVOS_FIJOS
+        # 1. Obtener S&P 500
+        url_sp = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
+        sp500 = pd.read_html(url_sp)[0]['Symbol'].tolist()
+        
+        # 2. Obtener NASDAQ-100 (Para cubrir el QQQ completo)
+        url_nasdaq = 'https://en.wikipedia.org/wiki/Nasdaq-100#Components'
+        nasdaq100 = pd.read_html(url_nasdaq)[4]['Ticker'].tolist()
+        
+        # Limpieza de símbolos (puntos por guiones para yfinance)
+        combined = [s.replace('.', '-') for s in (sp500 + nasdaq100 + MIS_ACTIVOS_FIJOS)]
+        
+        # Eliminar duplicados y ordenar
+        return sorted(list(set(combined)))
+    except Exception as e:
+        # En caso de error de conexión, usamos al menos tus activos fijos
+        return MIS_ACTIVOS_FIJOS
 
 @st.cache_data(ttl=3600)
 def fetch_full_data(ticker):
