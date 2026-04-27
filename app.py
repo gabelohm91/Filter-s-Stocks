@@ -8,10 +8,8 @@ from datetime import datetime
 
 st.set_page_config(page_title="Terminal Pro - Gabriel Herrera", layout="wide")
 
-if 'last_update' not in st.session_state:
-    st.session_state['last_update'] = datetime.now().strftime("%H:%M:%S")
-
-st.title("💎 Terminal de Valor y Estrategia de Acecho")
+# Título y Estado
+st.title("💎 Terminal de Estrategia de Acecho")
 
 # --- BARRA LATERAL ---
 st.sidebar.header("⚙️ Parámetros de Ingeniería")
@@ -20,21 +18,11 @@ min_net_income = st.sidebar.number_input("Net Income Mínimo (Billones $)", valu
 max_de_ratio = st.sidebar.slider("Debt/Equity Máximo (%)", 0, 300, 120)
 rsi_anual_limit = st.sidebar.slider("Filtro RSI Anual Máx", 10, 70, 45)
 
-if st.sidebar.button('🔄 Refrescar Datos'):
-    st.cache_data.clear()
-    st.session_state['last_update'] = datetime.now().strftime("%H:%M:%S")
-
-# --- GUÍA DE REFERENCIA ---
-with st.expander("📖 Manual de Estrategia y Parámetros"):
+# --- GUÍA DE ESTRATEGIA ---
+with st.expander("📖 Manual de Acecho"):
     st.markdown("""
-    ### 🏗️ Fundamentales
-    * **Debt/Equity:** Máximo 120%. Buscamos solvencia.
-    * **Net Income:** Solo empresas con utilidades reales (> 0).
-
-    ### 📉 Indicadores de Acecho
-    * **52 Week Price % Change:** * **0%:** El precio está en el mínimo del año. ¡Punto óptimo de entrada!
-        * **0% a 5%:** Zona de Acecho.
-    * **RSI Anual (50):** Evalúa la fuerza del precio en una ventana de 1 año. Menos de 45 indica una empresa "castigada" por el mercado pero con valor.
+    * **52W Low %:** El objetivo es **0%**. Es cuando el precio "besa" el suelo anual.
+    * **RSI Anual (50):** Buscamos que esté en la zona baja (púrpura) mientras los fundamentales sean sólidos.
     """)
 
 tickers = ["KO", "PEP", "MCD", "JNJ", "DHR", "XOM", "CVX", "PG", "JPM", "MSFT", "AAPL", "TXN", "WMT", "COST", "V", "MA", "SNY", "MCHI"]
@@ -45,22 +33,22 @@ def fetch_full_data(ticker):
         stock = yf.Ticker(ticker)
         hist = stock.history(period="2y")
         info = stock.info
+        # Cálculos Técnicos
         hist['MA50'] = ta.sma(hist['Close'], length=50)
-        hist['MA125'] = ta.sma(hist['Close'], length=125)
         hist['MA200'] = ta.sma(hist['Close'], length=200)
         hist['RSI_50'] = ta.rsi(hist['Close'], length=50)
-        bb = ta.bbands(hist['Close'], length=20, std=2)
         macd = ta.macd(hist['Close'])
+        bb = ta.bbands(hist['Close'], length=20, std=2)
         hist = pd.concat([hist, macd, bb], axis=1)
+        
         last = hist.iloc[-1]
         min_52w = hist['Close'].tail(252).min()
+        
         return {
             "Ticker": ticker, "Precio": round(last['Close'], 2),
             "RSI Anual": round(last['RSI_50'], 2),
-            "MA50": round(last['MA50'], 2), "MA125": round(last['MA125'], 2), "MA200": round(last['MA200'], 2),
-            "MACD": round(last['MACD_12_26_9'], 3), "Señal": round(last['MACDs_12_26_9'], 3),
-            "Net Inc(B)": round(info.get('netIncomeToCommon', 0) / 1e9, 2),
             "D/E Ratio(%)": round(info.get('debtToEquity', 0), 2),
+            "Net Inc(B)": round(info.get('netIncomeToCommon', 0) / 1e9, 2),
             "Mkt Cap(B)": round(info.get('marketCap', 0) / 1e9, 2),
             "52W Low %": round(((last['Close'] - min_52w) / min_52w) * 100, 2),
             "df": hist
@@ -74,7 +62,7 @@ for t in tickers:
         data_list.append(res)
 
 if data_list:
-    st.subheader(f"📋 Monitor de Oportunidades ({len(data_list)})")
+    st.subheader(f"📋 Oportunidades Detectadas ({len(data_list)})")
     st.dataframe(pd.DataFrame(data_list).drop(columns=['df']), use_container_width=True)
 
     st.divider()
@@ -87,47 +75,38 @@ if data_list:
         col_bbu = [c for c in df_p.columns if c.startswith('BBU')][0]
         col_bbl = [c for c in df_p.columns if c.startswith('BBL')][0]
 
-        # CAMBIO CLAVE: Quitamos shared_xaxes para evitar que las trazas se "filtren"
-        fig = make_subplots(rows=3, cols=1, 
-                            shared_xaxes=False, 
-                            vertical_spacing=0.12,
-                            row_heights=[0.5, 0.2, 0.3],
-                            subplot_titles=("PRECIO Y SOPORTES", "RSI ANUAL (50)", "MACD"))
+        # --- GRÁFICA MAESTRA ---
+        # Solo 2 filas: una grande para Precio/RSI y una pequeña para MACD
+        fig = make_subplots(rows=2, cols=1, 
+                            shared_xaxes=True, 
+                            vertical_spacing=0.05,
+                            row_heights=[0.7, 0.3],
+                            specs=[[{"secondary_y": True}], [{"secondary_y": False}]])
+
+        # 1. TRAZAS DE PRECIO (Eje Y Primario - Izquierda)
+        fig.add_trace(go.Candlestick(x=df_p.index, open=df_p['Open'], high=df_p['High'], low=df_p['Low'], close=df_p['Close'], name="Precio"), row=1, col=1, secondary_y=False)
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA200'], line=dict(color='red', width=2), name="MA200"), row=1, col=1, secondary_y=False)
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p[col_bbu], line=dict(color='rgba(173,216,230,0.15)', width=1), name="B.Sup"), row=1, col=1, secondary_y=False)
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p[col_bbl], line=dict(color='rgba(173,216,230,0.15)', width=1), fill='tonexty', name="B.Inf"), row=1, col=1, secondary_y=False)
+
+        # 2. TRAZA DE RSI (Eje Y Secundario - Derecha)
+        # Aquí forzamos que sea SOLAMENTE la línea del RSI
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['RSI_50'], line=dict(color='#C084FC', width=3), name="RSI Anual"), row=1, col=1, secondary_y=True)
         
-        def add_lab(fig, y, text, color, row, col, offset=0):
-            fig.add_annotation(x=df_p.index[-1], y=y, text=text, showarrow=False, xanchor="left",
-                               xshift=15, yshift=offset, font=dict(size=14, color=color, family="Arial Black"), 
-                               bgcolor="rgba(0,0,0,0.8)", row=row, col=col)
+        # Ajuste de escalas para que el RSI aparezca en la parte inferior sin chocar
+        fig.update_yaxes(title_text="Precio ($)", secondary_y=False, row=1, col=1)
+        fig.update_yaxes(title_text="RSI", range=[-50, 150], secondary_y=True, row=1, col=1, showgrid=False)
 
-        # 1. PRECIO
-        fig.add_trace(go.Candlestick(x=df_p.index, open=df_p['Open'], high=df_p['High'], low=df_p['Low'], close=df_p['Close'], name="Precio"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA50'], line=dict(color='cyan', width=1), name="MA50"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA125'], line=dict(color='yellow', width=1), name="MA125"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA200'], line=dict(color='red', width=2), name="MA200"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df_p.index, y=df_p[col_bbu], line=dict(color='rgba(173,216,230,0.2)', width=1), name="B.Sup"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df_p.index, y=df_p[col_bbl], line=dict(color='rgba(173,216,230,0.2)', width=1), fill='tonexty', name="B.Inf"), row=1, col=1)
-        add_lab(fig, last_p['Close'], f"<b>${item['Precio']}</b>", "white", 1, 1, 20)
-        add_lab(fig, last_p[col_bbu], f"BS: {round(last_p[col_bbu],2)}", "lightblue", 1, 1, 10)
-        add_lab(fig, last_p[col_bbl], f"BI: {round(last_p[col_bbl],2)}", "lightblue", 1, 1, -10)
-
-        # 2. RSI ANUAL - EXCLUSIVO
-        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['RSI_50'], line=dict(color='#C084FC', width=2), name="RSI Anual"), row=2, col=1)
-        fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
-        fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
-        fig.update_yaxes(range=[0, 100], row=2, col=1)
-        add_lab(fig, last_p['RSI_50'], f"<b>RSI(50): {item['RSI Anual']}</b>", "#C084FC", 2, 1)
-
-        # 3. MACD
+        # 3. MACD (Fila 2)
         h_colors = ['#26a69a' if v >= 0 else '#ef5350' for v in df_p['MACDh_12_26_9']]
-        fig.add_trace(go.Bar(x=df_p.index, y=df_p['MACDh_12_26_9'], marker_color=h_colors, name="Hist"), row=3, col=1)
-        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACD_12_26_9'], line=dict(color='#2962ff', width=2), name="MACD"), row=3, col=1)
-        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACDs_12_26_9'], line=dict(color='#ff6d00', width=2), name="Señal"), row=3, col=1)
-        add_lab(fig, last_p['MACD_12_26_9'], f"M: {item['MACD']}", "#2962ff", 3, 1, 15)
-        add_lab(fig, last_p['MACDs_12_26_9'], f"S: {item['Señal']}", "#ff6d00", 3, 1, -15)
+        fig.add_trace(go.Bar(x=df_p.index, y=df_p['MACDh_12_26_9'], marker_color=h_colors, name="Hist"), row=2, col=1)
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACD_12_26_9'], line=dict(color='#2962ff', width=2), name="MACD"), row=2, col=1)
 
-        fig.update_layout(height=1100, template="plotly_dark", xaxis_rangeslider_visible=True, margin=dict(r=180))
-        # Sincronizamos manualmente el zoom de los ejes X
-        fig.update_xaxes(matches='x') 
+        # Anotaciones de valor
+        fig.add_annotation(x=df_p.index[-1], y=last_p['Close'], text=f"<b>${item['Precio']}</b>", showarrow=False, xshift=40, font=dict(color="white"), bgcolor="black", row=1, col=1)
+        fig.add_annotation(x=df_p.index[-1], y=last_p['RSI_50'], text=f"<b>RSI: {item['RSI Anual']}</b>", showarrow=False, xshift=40, font=dict(color="#C084FC"), bgcolor="black", row=1, col=1, secondary_y=True)
+
+        fig.update_layout(height=900, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(r=150))
         st.plotly_chart(fig, use_container_width=True)
 else:
-    st.warning("Sin resultados.")
+    st.warning("Ajusta los filtros para encontrar oportunidades.")
