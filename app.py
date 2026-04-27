@@ -1,3 +1,4 @@
+
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -14,11 +15,11 @@ if 'last_update' not in st.session_state:
 
 st.title("💎 Terminal de Valor y Estrategia de Acecho")
 
-# --- GUÍA DE PARÁMETROS (REINTEGRADA) ---
+# --- GUÍA DE PARÁMETROS (MANTENIDA) ---
 with st.expander("📖 MANUAL DE INTERPRETACIÓN: RADIOGRAFÍA TÉCNICA Y FUNDAMENTAL"):
     st.markdown("""
     * **MA50/125/200**: Representan tendencias de corto, mediano y largo plazo. El precio por encima de la MA200 indica salud estructural.
-    * **RSI Anual (50)**: Buscamos activos por debajo de 60-65 para evitar sobrecompra en horizontes largos.
+    * **RSI (14)**: Momentum de corto plazo. Buscamos activos en niveles de oportunidad (cerca de 30) o filtrados por debajo de un límite.
     * **MACD & Señal**: El cruce del MACD por encima de la Señal indica un momentum de entrada alcista.
     * **Debt/Equity**: Evalúa el apalancamiento. Idealmente buscamos valores sostenibles para estabilidad financiera.
     """)
@@ -28,7 +29,8 @@ st.sidebar.header("⚙️ Parámetros de Ingeniería")
 market_cap_min = st.sidebar.number_input("Market Cap Mín (Billones $)", value=20)
 min_net_income = st.sidebar.number_input("Net Income Mínimo (Billones $)", value=0)
 max_de_ratio = st.sidebar.slider("Debt/Equity Máximo (%)", 0, 400, 150)
-rsi_anual_limit = st.sidebar.slider("Filtro RSI Anual Máx", 10, 100, 65)
+# Ajustado a RSI 14 según tu solicitud
+rsi_limit = st.sidebar.slider("Filtro RSI (14) Máx", 10, 100, 65)
 
 if st.sidebar.button('🔄 Refrescar Datos'):
     st.cache_data.clear()
@@ -44,7 +46,6 @@ def get_all_tickers():
     except:
         sp500 = ["AAPL", "MSFT", "GOOGL", "VOO", "QQQ"]
     
-    # Lista extendida basada en tus preferencias de valor y crecimiento
     especiales = [
         "SCHD", "VGT", "VXUS", "VUG", "DHR", "KO", "PEP", "COST", 
         "MCHI", "SNY", "TXN", "JPM", "V", "MA", "ABBV", "SBUX", 
@@ -56,16 +57,17 @@ def get_all_tickers():
 def fetch_full_data(ticker):
     try:
         stock = yf.Ticker(ticker)
-        hist = stock.history(period="2y")
+        # Intervalo de días como solicitaste
+        hist = stock.history(period="2y", interval="1d")
         if hist.empty or len(hist) < 252: return None
         
         info = stock.info
         
-        # Cálculos Técnicos (MA, RSI, BB, MACD)
+        # Cálculos Técnicos (Ajustado a RSI 14)
         hist['MA50'] = ta.sma(hist['Close'], length=50)
         hist['MA125'] = ta.sma(hist['Close'], length=125)
         hist['MA200'] = ta.sma(hist['Close'], length=200)
-        hist['RSI_50'] = ta.rsi(hist['Close'], length=50)
+        hist['RSI_14'] = ta.rsi(hist['Close'], length=14)
         bb = ta.bbands(hist['Close'], length=20, std=2)
         macd = ta.macd(hist['Close'])
         hist = pd.concat([hist, macd, bb], axis=1)
@@ -85,7 +87,7 @@ def fetch_full_data(ticker):
             "Ticker": ticker, 
             "Precio": round(price_now, 2), 
             "52W Chg %": round(change_52w, 2),
-            "RSI(50)": round(last['RSI_50'], 2), 
+            "RSI(14)": round(last['RSI_14'], 2), # RSI 14 en la tabla
             "MA50": fmt_ma(last['MA50'], price_now),
             "MA125": fmt_ma(last['MA125'], price_now), 
             "MA200": fmt_ma(last['MA200'], price_now),
@@ -105,8 +107,8 @@ if st.checkbox("🚀 Iniciar Escaneo Profundo"):
     for i, t in enumerate(all_tickers):
         res = fetch_full_data(t)
         if res:
-            # Filtros de ingeniería aplicados
-            if (res["RSI(50)"] <= rsi_anual_limit and 
+            # Filtro por RSI 14
+            if (res["RSI(14)"] <= rsi_limit and 
                 res["Net Inc(B)"] >= min_net_income and 
                 res["D/E Ratio(%)"] <= max_de_ratio):
                 data_list.append(res)
@@ -141,19 +143,17 @@ if data_list:
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p[c_bbu], line=dict(color='rgba(255,255,255,0.3)', dash='dot'), name="B.Sup"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p[c_bbl], line=dict(color='rgba(255,255,255,0.3)', dash='dot'), name="B.Inf"), row=1, col=1)
 
-        # ANOTACIONES ESCALONADAS (Evita solapamiento)
-        # Precio: Indicado con flecha a la izquierda del final
+        # ANOTACIONES ESCALONADAS
         fig.add_annotation(x=df_p.index[-5], y=last_p['Close'], text=f"PRECIO: ${round(last_p['Close'],2)}", 
                            showarrow=True, arrowhead=1, row=1, col=1, font=dict(color="white", size=14), bgcolor="black")
-        # Bandas: A la derecha del gráfico
         fig.add_annotation(x=df_p.index[-1], y=last_p[c_bbu], text=f"B.SUP: ${round(last_p[c_bbu],2)}", 
                            showarrow=False, xanchor="left", xshift=10, row=1, col=1, font=dict(color="#00d4ff", size=12), bgcolor="rgba(0,0,0,0.5)")
         fig.add_annotation(x=df_p.index[-1], y=last_p[c_bbl], text=f"B.INF: ${round(last_p[c_bbl],2)}", 
                            showarrow=False, xanchor="left", xshift=10, row=1, col=1, font=dict(color="#00d4ff", size=12), bgcolor="rgba(0,0,0,0.5)")
 
-        # 2. PANEL RSI
-        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['RSI_50'], line=dict(color='#C084FC', width=2)), row=2, col=1)
-        fig.add_annotation(x=df_p.index[-1], y=last_p['RSI_50'], text=f"RSI: {round(last_p['RSI_50'],2)}", 
+        # 2. PANEL RSI (14) - ACTUALIZADO
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['RSI_14'], line=dict(color='#C084FC', width=2), name="RSI(14)"), row=2, col=1)
+        fig.add_annotation(x=df_p.index[-1], y=last_p['RSI_14'], text=f"RSI(14): {round(last_p['RSI_14'],2)}", 
                            showarrow=False, xanchor="left", xshift=10, row=2, col=1, font=dict(color="#C084FC", size=12))
         fig.add_hline(y=30, line_color="green", line_dash="dash", row=2, col=1)
         fig.add_hline(y=70, line_color="red", line_dash="dash", row=2, col=1)
@@ -164,7 +164,6 @@ if data_list:
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACD_12_26_9'], line=dict(color='#2962ff'), name="MACD"), row=3, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACDs_12_26_9'], line=dict(color='#ff6d00'), name="Señal"), row=3, col=1)
         
-        # Anotaciones MACD con separación vertical
         fig.add_annotation(x=df_p.index[-1], y=last_p['MACD_12_26_9'], text=f"MACD: {round(last_p['MACD_12_26_9'],3)}", 
                            showarrow=False, xanchor="left", xshift=10, yshift=10, row=3, col=1, font=dict(color="#2962ff", size=12))
         fig.add_annotation(x=df_p.index[-1], y=last_p['MACDs_12_26_9'], text=f"SEÑAL: {round(last_p['MACDs_12_26_9'],3)}", 
