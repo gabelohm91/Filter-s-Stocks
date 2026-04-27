@@ -9,9 +9,10 @@ from datetime import datetime
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Terminal Pro - Gabriel Herrera", layout="wide")
 
-# Estado para controlar el envío automático diario
 if 'last_update' not in st.session_state:
-    st.session_state['last_update'] = datetime.now().strftime("%H:%M:%S")
+   st.session_state['last_update'] = datetime.now().strftime("%H:%M:%S")
+
+# Estado para controlar el envío automático diario y no repetir correos
 if 'email_enviado_hoy' not in st.session_state:
     st.session_state['email_enviado_hoy'] = None
 
@@ -23,7 +24,7 @@ with st.expander("📖 MANUAL DE INTERPRETACIÓN: RADIOGRAFÍA TÉCNICA Y FUNDAM
     * **MA50/125/200**: Representan tendencias de corto, mediano y largo plazo.
     * **RSI (14)**: Momentum de corto plazo. Buscamos activos cerca de 30.
     * **MACD & Señal**: El cruce indica momentum de entrada alcista.
-    * **Debt/Equity**: Evalúa el apalancamiento.
+    * **Debt/Equity**: Evalúa el apalancamiento para estabilidad financiera.
     """)
 
 # --- BARRA LATERAL ---
@@ -36,7 +37,7 @@ rsi_limit = st.sidebar.slider("Filtro RSI (14) Máx", 10, 100, 65)
 st.sidebar.divider()
 st.sidebar.header("📧 Configuración de Alertas")
 if 'user_email' not in st.session_state:
-    st.session_state['user_email'] = "gabelohm@live.com" #
+    st.session_state['user_email'] = "gabelohm@live.com"
 
 email_input = st.sidebar.text_input("Configurar correo de destino:", value=st.session_state['user_email'])
 if st.sidebar.button("💾 Actualizar Correo"):
@@ -86,7 +87,6 @@ def fetch_full_data(ticker):
         c_bbl = [c for c in hist.columns if c.startswith('BBL')][0]
         
         alerta_compra = False
-        # Criterios de Acecho para Gabriel
         if last['RSI_14'] <= 32 or price_now <= last[c_bbl] * 1.02 or last['MACD_12_26_9'] <= 0.05:
            alerta_compra = True
 
@@ -123,7 +123,7 @@ if data_scan:
     st.subheader(f"📋 Resultados del Acecho ({len(data_scan)} activos)")
     st.dataframe(df_view, use_container_width=True)
     
-    # --- 2. GRÁFICAS ---
+    # --- 2. GRÁFICAS (CON TEXTOS AJUSTADOS SIN SOBREPOSICIÓN) ---
     seleccion = st.selectbox("🎯 Análisis Técnico Detallado:", df_view["Ticker"].tolist())
     if seleccion:
         item = next(i for i in data_scan if i["Ticker"] == seleccion)
@@ -132,11 +132,12 @@ if data_scan:
         c_bbu, c_bbl = [c for c in df_p.columns if c.startswith('BBU')][0], [c for c in df_p.columns if c.startswith('BBL')][0]
 
         fig = make_subplots(
-            rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.05,
+            rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.07,
             subplot_titles=("Precio y Bandas Bollinger", "RSI (14)", "MACD e Impulso"),
             row_heights=[0.5, 0.2, 0.3]
         )
 
+        # Panel 1: Precio y Bandas
         fig.add_trace(go.Candlestick(x=df_p.index, open=df_p['Open'], high=df_p['High'], low=df_p['Low'], close=df_p['Close'], name="Precio"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA50'], line=dict(color='cyan', width=1), name="MA50"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA125'], line=dict(color='orange', width=1), name="MA125"), row=1, col=1)
@@ -144,19 +145,25 @@ if data_scan:
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p[c_bbu], line=dict(color='rgba(255,255,255,0.3)', dash='dot'), name="B.Sup"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p[c_bbl], line=dict(color='rgba(255,255,255,0.3)', dash='dot'), name="B.Inf"), row=1, col=1)
 
-        # Mantenemos etiquetas de Bandas y Precio solicitadas
-        fig.add_annotation(x=df_p.index[-1], y=last_p['Close'], text=f" PRECIO: ${round(last_p['Close'],2)}", showarrow=False, xanchor="left", xshift=10, row=1, col=1, font=dict(color="white"), bgcolor="black")
-        fig.add_annotation(x=df_p.index[-1], y=last_p[c_bbu], text=f" B.SUP: ${round(last_p[c_bbu],2)}", showarrow=False, xanchor="left", xshift=10, row=1, col=1, font=dict(color="#00d4ff"))
-        fig.add_annotation(x=df_p.index[-1], y=last_p[c_bbl], text=f" B.INF: ${round(last_p[c_bbl],2)}", showarrow=False, xanchor="left", xshift=10, row=1, col=1, font=dict(color="#00d4ff"))
+        # VALORES PANEL 1: Separados mediante yshift para evitar traslape
+        fig.add_annotation(x=df_p.index[-1], y=last_p['Close'], text=f" PRECIO: ${round(last_p['Close'],2)}", showarrow=False, xanchor="left", xshift=15, row=1, col=1, font=dict(color="white"), bgcolor="black")
+        fig.add_annotation(x=df_p.index[-1], y=last_p[c_bbu], text=f" B.SUP: ${round(last_p[c_bbu],2)}", showarrow=False, xanchor="left", xshift=15, yshift=20, row=1, col=1, font=dict(color="#00d4ff"))
+        fig.add_annotation(x=df_p.index[-1], y=last_p[c_bbl], text=f" B.INF: ${round(last_p[c_bbl],2)}", showarrow=False, xanchor="left", xshift=15, yshift=-20, row=1, col=1, font=dict(color="#00d4ff"))
 
+        # Panel 2: RSI
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['RSI_14'], line=dict(color='#C084FC', width=2), name="RSI(14)"), row=2, col=1)
-        fig.add_annotation(x=df_p.index[-1], y=last_p['RSI_14'], text=f" RSI: {round(last_p['RSI_14'], 2)}", showarrow=False, xanchor="left", xshift=10, row=2, col=1, font=dict(color="#C084FC"))
-        
+        fig.add_annotation(x=df_p.index[-1], y=last_p['RSI_14'], text=f" RSI: {round(last_p['RSI_14'], 2)}", showarrow=False, xanchor="left", xshift=15, row=2, col=1, font=dict(color="#C084FC"))
+
+        # Panel 3: MACD + SEÑAL (VALORES RECUPERADOS)
         hist_colors = ['#26a69a' if v >= 0 else '#ef5350' for v in df_p['MACDh_12_26_9']]
         fig.add_trace(go.Bar(x=df_p.index, y=df_p['MACDh_12_26_9'], marker_color=hist_colors, name="Impulso"), row=3, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACD_12_26_9'], line=dict(color='#2962ff'), name="MACD"), row=3, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACDs_12_26_9'], line=dict(color='#ff6d00'), name="Señal"), row=3, col=1)
         
+        # VALORES PANEL 3: Uso de yshift positivo y negativo para legibilidad total
+        fig.add_annotation(x=df_p.index[-1], y=last_p['MACD_12_26_9'], text=f" MACD: {round(last_p['MACD_12_26_9'], 3)}", showarrow=False, xanchor="left", xshift=15, yshift=15, row=3, col=1, font=dict(color="#2962ff"))
+        fig.add_annotation(x=df_p.index[-1], y=last_p['MACDs_12_26_9'], text=f" SEÑAL: {round(last_p['MACDs_12_26_9'], 3)}", showarrow=False, xanchor="left", xshift=15, yshift=-15, row=3, col=1, font=dict(color="#ff6d00"))
+
         fig.update_layout(height=1000, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(r=150))
         st.plotly_chart(fig, use_container_width=True)
 
@@ -180,26 +187,23 @@ if data_plan:
     
     st.dataframe(df_plan.style.map(highlight_alerts, subset=['Alerta']), use_container_width=True)
 
-    # --- LÓGICA DE AUTOMATIZACIÓN HORARIA (12:00 PM) ---
+    # --- LÓGICA DE AUTOMATIZACIÓN A LAS 12:00 PM ---
     ahora = datetime.now()
     fecha_hoy = ahora.strftime("%Y-%m-%d")
     
-    # Si son las 12:00 PM o más tarde, hay alertas, y no se ha enviado hoy:
+    # Si son las 12:00 PM o más, hay alertas, y no se ha enviado hoy:
     if ahora.hour >= 12 and alertas_detectadas and st.session_state['email_enviado_hoy'] != fecha_hoy:
-        # Aquí se dispara la acción automática
-        st.toast(f"🚀 ¡Alerta Automática detectada a las {ahora.strftime('%H:%M')}!", icon="📧")
-        # Simulación de envío
-        st.success(f"📬 INFORME DIARIO AUTOMÁTICO ENVIADO a {st.session_state['user_email']}")
-        st.info(f"Activos en oportunidad: {', '.join(alertas_detectadas)}")
-        
-        # Marcamos como enviado para evitar bucles de refresco
+        st.toast(f"✅ Disparando alerta automática de mediodía...", icon="📧")
+        # Simulación de envío automático
+        st.success(f"📬 Informe enviado automáticamente a {st.session_state['user_email']}")
+        # Registro para no repetir el envío hasta el día siguiente
         st.session_state['email_enviado_hoy'] = fecha_hoy
     
-    # Botón manual (se mantiene por si quieres enviar antes de las 12)
     if alertas_detectadas:
         st.warning(f"⚠️ Oportunidades detectadas: {', '.join(alertas_detectadas)}")
         if st.button("📧 Enviar Informe Manual ahora"):
-            st.info(f"Enviando informe manual a {st.session_state['user_email']}...")
+            st.info(f"Enviando informe a {st.session_state['user_email']}...")
 
-# Pie de página con el estado del envío automático
-st.sidebar.write(f"📅 Estado Auto-Envío: {'✅ Enviado hoy' if st.session_state['email_enviado_hoy'] == datetime.now().strftime('%Y-%m-%d') else '⏳ Pendiente (12:00 PM)'}")
+# Indicador de estado en la barra lateral
+st.sidebar.divider()
+st.sidebar.write(f"📅 Auto-envío: {'✅ Realizado' if st.session_state['email_enviado_hoy'] == datetime.now().strftime('%Y-%m-%d') else '⏳ Programado 12:00 PM'}")
