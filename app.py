@@ -120,7 +120,7 @@ if data_scan:
     st.subheader(f"📋 Resultados del Acecho ({len(data_scan)} activos)")
     st.dataframe(df_view, use_container_width=True)
     
-    # --- 2. GRÁFICAS (CON TÍTULOS Y VALORES DINÁMICOS) ---
+    # --- 2. GRÁFICAS (CON TÍTULOS Y VALORES AJUSTADOS) ---
     seleccion = st.selectbox("🎯 Análisis Técnico Detallado:", df_view["Ticker"].tolist())
     if seleccion:
         item = next(i for i in data_scan if i["Ticker"] == seleccion)
@@ -128,12 +128,11 @@ if data_scan:
         last_p = df_p.iloc[-1]
         c_bbu, c_bbl = [c for c in df_p.columns if c.startswith('BBU')][0], [c for c in df_p.columns if c.startswith('BBL')][0]
 
-        # Títulos de sub-gráficas agregados aquí
         fig = make_subplots(
             rows=3, cols=1, 
             shared_xaxes=True, 
             vertical_spacing=0.05,
-            subplot_titles=("Gráfico de Precios y Medias Móviles", "RSI (Momentum)", "MACD (Convergencia/Divergencia)"),
+            subplot_titles=("Precio y Bandas Bollinger", "RSI (14)", "MACD e Impulso"),
             row_heights=[0.5, 0.2, 0.3]
         )
 
@@ -145,26 +144,28 @@ if data_scan:
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p[c_bbu], line=dict(color='rgba(255,255,255,0.3)', dash='dot'), name="B.Sup"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p[c_bbl], line=dict(color='rgba(255,255,255,0.3)', dash='dot'), name="B.Inf"), row=1, col=1)
 
-        # Anotaciones Panel 1
-        fig.add_annotation(x=df_p.index[-1], y=last_p['Close'], text=f"PRECIO: ${round(last_p['Close'],2)}", showarrow=True, arrowhead=1, row=1, col=1, font=dict(color="white"), bgcolor="black")
+        # VALORES PANEL 1 (Precio, Superior, Inferior)
+        fig.add_annotation(x=df_p.index[-1], y=last_p['Close'], text=f" PRECIO: ${round(last_p['Close'],2)}", showarrow=False, xanchor="left", xshift=10, row=1, col=1, font=dict(color="white"), bgcolor="black")
+        fig.add_annotation(x=df_p.index[-1], y=last_p[c_bbu], text=f" B.SUP: ${round(last_p[c_bbu],2)}", showarrow=False, xanchor="left", xshift=10, row=1, col=1, font=dict(color="#00d4ff"))
+        fig.add_annotation(x=df_p.index[-1], y=last_p[c_bbl], text=f" B.INF: ${round(last_p[c_bbl],2)}", showarrow=False, xanchor="left", xshift=10, row=1, col=1, font=dict(color="#00d4ff"))
 
-        # Panel 2: RSI + Valor (Evitando traslape con xshift)
+        # Panel 2: RSI + VALOR
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['RSI_14'], line=dict(color='#C084FC', width=2), name="RSI(14)"), row=2, col=1)
         fig.add_annotation(x=df_p.index[-1], y=last_p['RSI_14'], text=f" RSI: {round(last_p['RSI_14'], 2)}", showarrow=False, xanchor="left", xshift=10, row=2, col=1, font=dict(color="#C084FC"))
         fig.add_hline(y=30, line_color="green", line_dash="dash", row=2, col=1)
         fig.add_hline(y=70, line_color="red", line_dash="dash", row=2, col=1)
 
-        # Panel 3: MACD + Valores (Separados por yshift para no contraporsi)
+        # Panel 3: MACD + SEÑAL + VALORES
         hist_colors = ['#26a69a' if v >= 0 else '#ef5350' for v in df_p['MACDh_12_26_9']]
         fig.add_trace(go.Bar(x=df_p.index, y=df_p['MACDh_12_26_9'], marker_color=hist_colors, name="Impulso"), row=3, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACD_12_26_9'], line=dict(color='#2962ff'), name="MACD"), row=3, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACDs_12_26_9'], line=dict(color='#ff6d00'), name="Señal"), row=3, col=1)
         
-        # Valores de MACD y Señal con desplazamiento vertical relativo
+        # Anotaciones MACD/Señal con yshift para evitar traslape
         fig.add_annotation(x=df_p.index[-1], y=last_p['MACD_12_26_9'], text=f" MACD: {round(last_p['MACD_12_26_9'], 3)}", showarrow=False, xanchor="left", xshift=10, yshift=10, row=3, col=1, font=dict(color="#2962ff"))
         fig.add_annotation(x=df_p.index[-1], y=last_p['MACDs_12_26_9'], text=f" SEÑAL: {round(last_p['MACDs_12_26_9'], 3)}", showarrow=False, xanchor="left", xshift=10, yshift=-10, row=3, col=1, font=dict(color="#ff6d00"))
 
-        fig.update_layout(height=1000, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(r=150, t=50))
+        fig.update_layout(height=1000, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(r=150))
         st.plotly_chart(fig, use_container_width=True)
 
 # --- 3. SEGUNDA TABLA: MI PLAN ESTRATÉGICO ---
@@ -184,7 +185,9 @@ if data_plan:
     df_plan = pd.DataFrame(data_plan).drop(columns=['df', 'info'])
     def highlight_alerts(val):
         return 'background-color: rgba(255, 75, 75, 0.3)' if val == "🚨 COMPRA" else ''
-    st.dataframe(df_plan.style.applymap(highlight_alerts, subset=['Alerta']), use_container_width=True)
+    
+    # Se utiliza .map() para evitar el AttributeError de versiones recientes de Pandas
+    st.dataframe(df_plan.style.map(highlight_alerts, subset=['Alerta']), use_container_width=True)
 
     if alertas_detectadas:
         st.warning(f"⚠️ Oportunidades de Compra Detectadas en tu Plan: {', '.join(alertas_detectadas)}")
