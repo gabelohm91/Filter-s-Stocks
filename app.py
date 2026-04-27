@@ -29,32 +29,184 @@ st.sidebar.success(f"✅ Sincronizado: {st.session_state['last_update']}")
 
 # --- GUÍA DE REFERENCIA ---
 with st.expander("📖 MANUAL DE INTERPRETACIÓN: RADIOGRAFÍA TÉCNICA Y FUNDAMENTAL"):
+    
     tab1, tab2, tab3 = st.tabs(["📈 Análisis Técnico", "💰 Análisis Fundamental", "🧭 Guía Rápida de Señales"])
 
     with tab1:
         st.markdown("## Indicadores Técnicos")
+
         st.markdown("### 🕯️ Velas (Candlestick)")
-        st.markdown("- 🟢 **Verde:** Cierre > Apertura. 🔴 **Roja:** Cierre < Apertura.")
+        st.markdown("""
+        Muestran la acción del precio en cada período: apertura, cierre, máximo y mínimo.  
+        - 🟢 **Vela verde:** El precio cerró *por encima* de la apertura (presión compradora).  
+        - 🔴 **Vela roja:** El precio cerró *por debajo* de la apertura (presión vendedora).  
+        > Úsalas para confirmar la dirección del mercado junto con los demás indicadores.
+        """)
+
         st.divider()
+
         st.markdown("### 📊 Medias Móviles (MA)")
-        st.markdown("| Media | Color | Significado |\n|-------|-------|-------------|\n| **MA200** | 🔴 Roja | Tendencia de largo plazo. |\n| **MA50** | 🩵 Cian | Tendencia de mediano plazo. |")
+        st.markdown("""
+        Promedian el precio durante un período para suavizar el ruido y revelar la tendencia real.
+
+        | Media | Color | Significado |
+        |-------|-------|-------------|
+        | **MA200** | 🔴 Roja | Tendencia de **largo plazo**. Es el gran filtro institucional. |
+        | **MA50** | 🩵 Cian | Tendencia de **mediano plazo**. Filtra el ruido mensual. |
+
+        **Cómo interpretar:**
+        - ✅ Precio **por encima** de MA200 → tendencia alcista saludable.
+        - ⚠️ Precio **por debajo** de MA200 → posible ciclo bajista o empresa en crisis.
+        - 🔔 Cuando MA50 cruza **por encima** de MA200 = *"Golden Cross"* → señal alcista poderosa.
+        - 💀 Cuando MA50 cruza **por debajo** de MA200 = *"Death Cross"* → señal bajista severa.
+        """)
+
         st.divider()
+
         st.markdown("### 📉 Bandas de Bollinger")
-        st.markdown("Miden la volatilidad. Tocar la **Banda Inferior** sugiere zona de rebote.")
+        st.markdown("""
+        Miden la **volatilidad** del precio. Se expanden cuando hay movimientos bruscos y se contraen en mercados tranquilos.
+
+        | Zona | Señal |
+        |------|-------|
+        | Precio toca **Banda Superior** | El activo está "estirado" al alza — posible techo temporal. |
+        | Precio toca **Banda Inferior** | El activo está "estirado" a la baja — posible zona de rebote. |
+        | Bandas muy **estrechas** | Baja volatilidad → suele preceder un movimiento explosivo. |
+
+        > ⚠️ Las Bollinger no indican dirección por sí solas. Combínalas con RSI o MACD para confirmar.
+        """)
+
         st.divider()
+
         st.markdown("### ⚡ RSI — Índice de Fuerza Relativa (período 50)")
-        st.markdown("Mide la **fuerza estructural** del último año. **< 35** es sobreventa histórica.")
+        st.markdown("""
+        Mide la **fuerza y velocidad** del movimiento del precio en una escala de 0 a 100.  
+        Usando un período de 50 se elimina el ruido diario y se revela la **fuerza estructural** del último año.
+
+        | Valor RSI | Zona | Interpretación |
+        |-----------|------|----------------|
+        | **< 30** | 🔴 Sobreventa extrema | Pánico en el mercado. Zona históricamente de compra institucional. Alta oportunidad. |
+        | **30 – 45** | 🟡 Zona de acecho | La empresa está barata respecto a su propia historia. Momento de análisis activo. |
+        | **45 – 55** | ⚪ Neutral | Ni barata ni cara. Sin señal clara. |
+        | **55 – 70** | 🟢 Momentum positivo | Fuerza alcista. Tendencia favorable, pero mantener cautela. |
+        | **> 70** | 🔴 Sobrecompra | El activo se ha subido demasiado rápido. Evitar comprar aquí — riesgo de corrección. |
+
+        > 💡 **Regla de oro:** RSI < 35 + precio en Banda Inferior de Bollinger = zona de alta atención para una posible entrada.
+        """)
+
         st.divider()
-        st.markdown("### 🌊 MACD — Inercia")
-        st.markdown("Cruce Azul sobre Naranja = Giro alcista.")
+
+        st.markdown("### 🌊 MACD — Convergencia/Divergencia de Medias")
+        st.markdown("""
+        Mide la **inercia (momentum)** del precio. Detecta cambios de tendencia antes de que se vean en el precio.
+
+        - 📘 **Línea MACD (Azul):** La velocidad actual del movimiento.
+        - 🟠 **Línea de Señal (Naranja):** Promedio suavizado del MACD. Actúa como disparador.
+        - 📊 **Histograma (Barras):** Diferencia entre ambas líneas — visual de la fuerza.
+
+        | Evento | Significado |
+        |--------|-------------|
+        | MACD cruza **por encima** de Señal | 🟢 Inercia cambia a **alcista** — posible entrada. |
+        | MACD cruza **por debajo** de Señal | 🔴 Inercia cambia a **bajista** — posible salida. |
+        | Histograma rojo **se acorta** | La presión vendedora está **muriendo** — posible giro próximo. |
+        | MACD positivo y subiendo | Momentum fuerte al alza. |
+
+        > 💡 El cruce del MACD es más potente cuando ocurre **por debajo de cero** (territorio bajista) → indica reversión desde mínimos.
+        """)
+
+        st.divider()
+
+        st.markdown("### 📅 Variación de Precio 52 Semanas (%)")
+        st.markdown("""
+        Muestra cuánto ha subido o bajado el precio en el **último año completo**.
+
+        | Rango | Interpretación |
+        |-------|----------------|
+        | **> +30%** | Momentum fuerte. Puede estar sobrecomprado o en tendencia genuina. |
+        | **0% a +30%** | Zona saludable. Apreciación moderada y sostenible. |
+        | **-10% a 0%** | Corrección menor. Puede ser oportunidad si los fundamentales son sólidos. |
+        | **-20% a -40%** | Zona de acecho. Alta posibilidad de valor si la empresa es rentable. |
+        | **< -40%** | Señal de alerta. Investigar si hay crisis estructural o es simple sobre-reacción del mercado. |
+
+        > ⚠️ Una caída fuerte no es automáticamente una oportunidad. Siempre cruzar con el análisis fundamental.
+        """)
 
     with tab2:
         st.markdown("## Indicadores Fundamentales")
-        st.markdown("### 💵 Net Income: Ganancia real neta.")
-        st.markdown("### ⚖️ Debt / Equity: Riesgo financiero. Se busca < 1.0 para máxima solidez.")
+
+        st.markdown("### 💵 Net Income (Beneficio Neto)")
+        st.markdown("""
+        Es lo que la empresa **realmente gana** después de pagar todos sus costos, impuestos y deudas. Es el indicador más directo de salud financiera.
+
+        | Valor | Señal |
+        |-------|-------|
+        | **> $5 Billones USD** | 🏆 Empresa élite. Generación de riqueza masiva y sostenida. |
+        | **$1B – $5B USD** | ✅ Empresa sólida y rentable. Señal clara de fortaleza operativa. |
+        | **$100M – $1B USD** | 🟡 Empresa rentable pero en escala media. Aceptable según el sector. |
+        | **$0 – $100M USD** | ⚠️ Rentabilidad marginal. Revisar tendencia: ¿está creciendo o estancada? |
+        | **Negativo (pérdidas)** | 🔴 La empresa está destruyendo capital. Solo válido si es una startup en expansión con plan claro. |
+
+        > 💡 **Lo más importante no es solo el número actual, sino la tendencia:** ¿El Net Income crece año a año? Una empresa que pasa de $500M a $2B en 3 años es mucho más interesante que una estancada en $3B.
+        """)
+
+        st.divider()
+
+        st.markdown("### ⚖️ Debt / Equity (Deuda sobre Patrimonio)")
+        st.markdown("""
+        Mide cuánta **deuda** usa la empresa en relación a su capital propio. Indica el nivel de riesgo financiero.
+
+        | Ratio | Interpretación |
+        |-------|----------------|
+        | **< 0.5** | 🟢 Empresa muy sólida. Poca deuda, gran independencia financiera. |
+        | **0.5 – 1.0** | ✅ Nivel saludable y común en empresas maduras. |
+        | **1.0 – 2.0** | 🟡 Deuda elevada pero manejable si el flujo de caja es fuerte. |
+        | **> 2.0** | 🔴 Riesgo alto. La empresa depende del crédito para operar. |
+        | **Negativo** | ⚠️ El patrimonio es negativo — señal de crisis o modelo de negocio inusual (ej. buybacks extremos). |
+
+        > ⚠️ El D/E varía mucho por sector: bancos y utilities naturalmente tienen D/E alto. Siempre comparar contra el promedio del sector, no contra un número universal.
+        """)
 
     with tab3:
-        st.markdown("### 🧭 Semáforo\n- 🟢 **Señal:** RSI < 35, Precio > MA200, MACD girando al alza.\n- 🔴 **Evitar:** RSI > 70, Precio < MA200.")
+        st.markdown("## 🧭 Guía Rápida: Semáforo de Señales")
+        st.markdown("Una referencia visual para evaluar de un vistazo si un activo merece atención.")
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.markdown("### 🔴 Evitar / Precaución")
+            st.markdown("""
+            - RSI **> 70** (sobrecompra)
+            - Precio **por debajo** de MA200
+            - MACD cruza **a la baja**
+            - Net Income **negativo o cayendo**
+            - Debt/Equity **> 2.0**
+            - Precio 52W **< -40%** sin explicación
+            """)
+
+        with col2:
+            st.markdown("### 🟡 Vigilar / Analizar")
+            st.markdown("""
+            - RSI entre **35 – 50**
+            - Precio cerca de MA50
+            - Histograma MACD **acortándose**
+            - Net Income **entre $100M – $1B**
+            - Debt/Equity **entre 1.0 – 2.0**
+            - Precio 52W entre **-10% y -30%**
+            """)
+
+        with col3:
+            st.markdown("### 🟢 Señal Positiva")
+            st.markdown("""
+            - RSI **< 35** (sobreventa)
+            - Precio **por encima** de MA200
+            - MACD cruza **al alza desde cero**
+            - Net Income **> $1B y creciendo**
+            - Debt/Equity **< 1.0**
+            - *Golden Cross* MA50 > MA200
+            """)
+
+        st.divider()
+        st.info("💡 **Recuerda:** Ningún indicador funciona en aislamiento. La señal más poderosa es cuando **técnico y fundamental coinciden**: empresa sólida con RSI en sobreventa y MACD girando al alza.")
 
 # --- GESTIÓN DE ACTIVOS (S&P 500 + SELECCIÓN ESTRATÉGICA) ---
 @st.cache_data(ttl=86400)
