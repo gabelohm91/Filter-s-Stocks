@@ -14,7 +14,7 @@ if 'last_update' not in st.session_state:
 
 st.title("💎 Terminal de Valor y Estrategia de Acecho")
 
-# --- BARRA LATERAL (FILTROS) ---
+# --- BARRA LATERAL ---
 st.sidebar.header("⚙️ Parámetros de Ingeniería")
 market_cap_min = st.sidebar.number_input("Market Cap Mín (Billones $)", value=50)
 min_net_income = st.sidebar.number_input("Net Income Mínimo (Billones $)", value=0)
@@ -27,29 +27,27 @@ if st.sidebar.button('🔄 Refrescar Datos de Mercado'):
 
 st.sidebar.success(f"✅ Sincronizado: {st.session_state['last_update']}")
 
-# --- GUÍA DE REFERENCIA TÉCNICA DETALLADA ---
-with st.expander("📖 Manual de Interpretación de Parámetros"):
+# --- GUÍA DE REFERENCIA TÉCNICA (DETALLADA) ---
+with st.expander("📖 Manual de Interpretación y Estrategia"):
     st.markdown("""
-    ### 🏗️ Fundamentales (Salud de la Empresa)
-    * **Market Cap (Capitalización):** Es el valor total de la empresa en el mercado.
-        * **+50B:** Empresas Large Cap, estables y con menos volatilidad.
-        * **+100B:** Blue Chips; líderes de industria (ej. KO, PEP, JNJ).
-    * **Net Income (Ingreso Neto):** Es la ganancia real después de todos los gastos.
-        * **Interpretación:** Debe ser siempre **positivo**. Una empresa de valor debe generar beneficios constantes para ser considerada segura.
-    * **Debt/Equity (D/E):** Mide cuánto debe la empresa comparado con lo que posee.
-        * **Valores < 100%:** Indica un balance sólido donde la empresa no depende excesivamente de préstamos.
-        * **100% - 120%:** Límite de seguridad para empresas industriales estables.
-        * **+150%:** Señal de alerta; la empresa podría estar demasiado apalancada.
+    ### 🏗️ Fundamentales (Salud Financiera)
+    * **Net Income:** Ganancia neta. Si es negativa, la empresa está quemando dinero. Buscamos rentabilidad.
+    * **Debt/Equity (D/E):** Relación deuda/patrimonio. 
+        * **< 100%:** Muy sano. 
+        * **120%:** Límite para empresas sólidas. Más de eso es riesgo de insolvencia.
+    * **Market Cap:** Tamaño de la empresa. +100B indica líderes mundiales resistentes a crisis.
 
-    ### 📉 Técnicos (Momento de Compra)
-    * **RSI (Relative Strength Index):** Mide si una acción está "sobrecomprada" o "sobrevendida".
-        * **RSI < 35:** Zona de **Acecho**. Indica que el precio ha caído mucho y podría estar en oferta.
-    * **MACD & Señal:** El MACD (azul) y la Señal (naranja) miden la inercia del precio.
-        * **Cruce alcista:** Si la línea azul cruza hacia arriba la naranja, la inercia está cambiando a positiva.
-    * **Bandas de Bollinger:** Miden la volatilidad. Si el precio toca la banda inferior, suele haber un rebote.
+    ### 📉 Indicadores de Oportunidad (Timing)
+    * **52 Week Price % Change:** Indica qué tan lejos está el precio actual del punto más bajo del último año.
+        * **0% a 5%:** La empresa está en su "suelo" anual. Gran oportunidad si los fundamentales son buenos.
+        * **+20%:** Ya rebotó y se alejó del mínimo.
+    * **RSI (Índice de Fuerza Relativa):** * **RSI < 35:** Sobreventa extrema (Acecho). El precio está "barato" técnicamente.
+    * **Medias Móviles (MA):**
+        * **MA50 (Cian):** Tendencia de corto plazo.
+        * **MA125 (Amarilla):** Tendencia intermedia.
+        * **MA200 (Roja):** El "Suelo de Hierro". Si el precio está cerca de la MA200, es una zona histórica de soporte.
     """)
 
-# Lista Maestra
 tickers = ["KO", "PEP", "MCD", "JNJ", "DHR", "XOM", "CVX", "PG", "JPM", "MSFT", "AAPL", "TXN", "WMT", "COST", "V", "MA", "SNY", "MCHI"]
 
 @st.cache_data(ttl=3600)
@@ -58,21 +56,16 @@ def fetch_full_data(ticker):
         stock = yf.Ticker(ticker)
         hist = stock.history(period="2y")
         info = stock.info
-        
-        # Indicadores Técnicos
         hist['MA50'] = ta.sma(hist['Close'], length=50)
         hist['MA125'] = ta.sma(hist['Close'], length=125)
         hist['MA200'] = ta.sma(hist['Close'], length=200)
         hist['RSI_14'] = ta.rsi(hist['Close'], length=14)
         hist['RSI_50'] = ta.rsi(hist['Close'], length=50)
-        
         bb = ta.bbands(hist['Close'], length=20, std=2)
         macd = ta.macd(hist['Close'])
         hist = pd.concat([hist, macd, bb], axis=1)
-        
         last = hist.iloc[-1]
         min_52w = hist['Close'].tail(252).min()
-        
         return {
             "Ticker": ticker, "Precio": round(last['Close'], 2),
             "RSI Mens": round(last['RSI_14'], 2), "RSI Anual": round(last['RSI_50'], 2),
@@ -86,14 +79,11 @@ def fetch_full_data(ticker):
         }
     except: return None
 
-# --- PROCESAMIENTO ---
 data_list = []
 for t in tickers:
     res = fetch_full_data(t)
-    if res:
-        if (res["Mkt Cap(B)"] >= market_cap_min and res["Net Inc(B)"] >= min_net_income and 
-            res["D/E Ratio(%)"] <= max_de_ratio and res["RSI Anual"] <= rsi_anual_limit):
-            data_list.append(res)
+    if res and res["Mkt Cap(B)"] >= market_cap_min and res["Net Inc(B)"] >= min_net_income and res["D/E Ratio(%)"] <= max_de_ratio and res["RSI Anual"] <= rsi_anual_limit:
+        data_list.append(res)
 
 if data_list:
     st.subheader(f"📋 Monitor de Oportunidades ({len(data_list)})")
@@ -106,47 +96,44 @@ if data_list:
         item = next(i for i in data_list if i["Ticker"] == seleccion)
         df_p = item["df"].tail(252)
         last_p = df_p.iloc[-1]
-        
         col_bbu = [c for c in df_p.columns if c.startswith('BBU')][0]
         col_bbl = [c for c in df_p.columns if c.startswith('BBL')][0]
 
-        fig = make_subplots(rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.05, 
+        fig = make_subplots(rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.06, 
                             row_heights=[0.5, 0.2, 0.3],
-                            subplot_titles=("Gráfica de Precios y Medias", "Índice de Fuerza Relativa (RSI)", "Convergencia/Divergencia (MACD)"))
+                            subplot_titles=("Precio, Medias y Bollinger", "RSI (Fuerza Relativa)", "MACD (Inercia)"))
         
-        # --- FUNCIÓN DE ETIQUETAS MEJORADA ---
         def add_lab(fig, y, text, color, row, col, offset=0):
             fig.add_annotation(x=df_p.index[-1], y=y, text=text, showarrow=False, xanchor="left",
-                               xshift=10, yshift=offset, font=dict(size=14, color=color), 
-                               bgcolor="rgba(0,0,0,0.7)", row=row, col=col)
+                               xshift=12, yshift=offset, font=dict(size=14, color=color), 
+                               bgcolor="rgba(0,0,0,0.8)", row=row, col=col)
 
-        # 1. PRECIO
+        # 1. FILA DE PRECIO
         fig.add_trace(go.Candlestick(x=df_p.index, open=df_p['Open'], high=df_p['High'], low=df_p['Low'], close=df_p['Close'], name="Precio"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA50'], line=dict(color='cyan', width=1), name="MA50"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA125'], line=dict(color='yellow', width=1), name="MA125"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA200'], line=dict(color='red', width=1.5), name="MA200"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df_p.index, y=df_p[col_bbu], line=dict(color='rgba(173,216,230,0.3)'), name="B.Sup"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df_p.index, y=df_p[col_bbl], line=dict(color='rgba(173,216,230,0.3)'), fill='tonexty', name="B.Inf"), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p[col_bbu], line=dict(color='rgba(173,216,230,0.2)'), name="B.Sup"), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p[col_bbl], line=dict(color='rgba(173,216,230,0.2)'), fill='tonexty', name="B.Inf"), row=1, col=1)
+        add_lab(fig, last_p['Close'], f"<b>Precio: ${item['Precio']}</b>", "white", 1, 1, 20)
+        add_lab(fig, last_p[col_bbu], f"BS: {round(last_p[col_bbu],2)}", "lightblue", 1, 1, 10)
+        add_lab(fig, last_p[col_bbl], f"BI: {round(last_p[col_bbl],2)}", "lightblue", 1, 1, -10)
 
-        add_lab(fig, last_p['Close'], f"<b>Precio: ${item['Precio']}</b>", "white", 1, 1, offset=15)
-        add_lab(fig, last_p[col_bbu], f"B.Sup: {round(last_p[col_bbu],2)}", "lightblue", 1, 1)
-        add_lab(fig, last_p[col_bbl], f"B.Inf: {round(last_p[col_bbl],2)}", "lightblue", 1, 1)
-
-        # 2. RSI (CORREGIDO: Ahora usa RSI_14)
+        # 2. FILA DE RSI (Limpia)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['RSI_14'], line=dict(color='#C084FC', width=2), name="RSI"), row=2, col=1)
         fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
         fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
         add_lab(fig, last_p['RSI_14'], f"<b>RSI: {item['RSI Mens']}</b>", "#C084FC", 2, 1)
 
-        # 3. MACD
-        colors = ['#26a69a' if v >= 0 else '#ef5350' for v in df_p['MACDh_12_26_9']]
-        fig.add_trace(go.Bar(x=df_p.index, y=df_p['MACDh_12_26_9'], marker_color=colors, name="Hist"), row=3, col=1)
+        # 3. FILA DE MACD (Limpia)
+        h_colors = ['#26a69a' if v >= 0 else '#ef5350' for v in df_p['MACDh_12_26_9']]
+        fig.add_trace(go.Bar(x=df_p.index, y=df_p['MACDh_12_26_9'], marker_color=h_colors, name="Hist"), row=3, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACD_12_26_9'], line=dict(color='#2962ff', width=2), name="MACD"), row=3, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACDs_12_26_9'], line=dict(color='#ff6d00', width=2), name="Señal"), row=3, col=1)
-        
-        # Ajuste de etiquetas para que no choquen en el MACD
-        add_lab(fig, last_p['MACD_12_26_9'], f"M:{item['MACD']}", "#2962ff", 3, 1, offset=10)
-        add_lab(fig, last_p['MACDs_12_26_9'], f"S:{item['Señal']}", "#ff6d00", 3, 1, offset=-10)
+        add_lab(fig, last_p['MACD_12_26_9'], f"M:{item['MACD']}", "#2962ff", 3, 1, 10)
+        add_lab(fig, last_p['MACDs_12_26_9'], f"S:{item['Señal']}", "#ff6d00", 3, 1, -10)
 
-        fig.update_layout(height=950, template="plotly_dark", xaxis_rangeslider_visible=True, margin=dict(r=120))
+        fig.update_layout(height=950, template="plotly_dark", xaxis_rangeslider_visible=True, margin=dict(r=150))
         st.plotly_chart(fig, use_container_width=True)
+else:
+    st.warning("Sin resultados.")
