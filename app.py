@@ -204,10 +204,6 @@ with st.expander("📖 MANUAL DE INTERPRETACIÓN: RADIOGRAFÍA TÉCNICA Y FUNDAM
             - Debt/Equity **< 1.0**
             - *Golden Cross* MA50 > MA200
             """)
-
-        st.divider()
-        st.info("💡 **Recuerda:** Ningún indicador funciona en aislamiento. La señal más poderosa es cuando **técnico y fundamental coinciden**: empresa sólida con RSI en sobreventa y MACD girando al alza.")
-
 # --- GESTIÓN DE ACTIVOS (S&P 500 + SELECCIÓN ESTRATÉGICA) ---
 @st.cache_data(ttl=86400)
 def get_all_tickers():
