@@ -16,10 +16,10 @@ st.title("💎 Terminal de Valor y Estrategia de Acecho")
 
 # --- BARRA LATERAL: PARÁMETROS DE INGENIERÍA ---
 st.sidebar.header("⚙️ Parámetros de Ingeniería")
-market_cap_min = st.sidebar.number_input("Market Cap Mín (Billones $)", value=20)
+market_cap_min = st.sidebar.number_input("Market Cap Mín (Billones $)", value=50)
 min_net_income = st.sidebar.number_input("Net Income Mínimo (Billones $)", value=0)
-max_de_ratio = st.sidebar.slider("Debt/Equity Máximo (%)", 0, 400, 150)
-rsi_anual_limit = st.sidebar.slider("Filtro RSI Anual Máx", 10, 100, 60)
+max_de_ratio = st.sidebar.slider("Debt/Equity Máximo (%)", 0, 300, 120)
+rsi_anual_limit = st.sidebar.slider("Filtro RSI Anual Máx", 10, 70, 50)
 
 if st.sidebar.button('🔄 Refrescar Datos'):
     st.cache_data.clear()
@@ -27,7 +27,7 @@ if st.sidebar.button('🔄 Refrescar Datos'):
 
 st.sidebar.success(f"✅ Sincronizado: {st.session_state['last_update']}")
 
-# --- GUÍA DE REFERENCIA (MANTENIDA) ---
+# --- GUÍA DE REFERENCIA ---
 with st.expander("📖 MANUAL DE INTERPRETACIÓN: RADIOGRAFÍA TÉCNICA Y FUNDAMENTAL"):
     
     tab1, tab2, tab3 = st.tabs(["📈 Análisis Técnico", "💰 Análisis Fundamental", "🧭 Guía Rápida de Señales"])
@@ -208,31 +208,34 @@ with st.expander("📖 MANUAL DE INTERPRETACIÓN: RADIOGRAFÍA TÉCNICA Y FUNDAM
         st.divider()
         st.info("💡 **Recuerda:** Ningún indicador funciona en aislamiento. La señal más poderosa es cuando **técnico y fundamental coinciden**: empresa sólida con RSI en sobreventa y MACD girando al alza.")
 
-# --- GESTIÓN DE ACTIVOS ---
+# --- GESTIÓN DE ACTIVOS (S&P 500 + SELECCIÓN ESTRATÉGICA) ---
 @st.cache_data(ttl=86400)
 def get_all_tickers():
+    # 1. Obtener S&P 500 desde Wikipedia
     try:
         url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
         sp500 = pd.read_html(url)[0]['Symbol'].tolist()
-        sp500 = [s.replace('.', '-') for s in sp500]
     except:
-        sp500 = ["AAPL", "MSFT", "GOOGL", "AMZN", "META"]
+        sp500 = ["AAPL", "MSFT", "GOOGL", "AMZN", "META"] # Fallback
 
+    # 2. Tu selección de Valor, ETFs y Prospectos
     especiales = [
-        "VOO", "QQQ", "SCHD", "VGT", "VXUS", "VUG", 
-        "LOW", "ABBV", "SBUX", "TGT", "DHR", "NEE", 
-        "ASML", "AVGO", "TSM", "NVDA", "ARM", 
-        "MCD", "KO", "PEP", "JNJ", "PG", "WMT", 
-        "V", "MA", "JPM", "BAC", "COST", "SNY"
+        "VOO", "QQQ", "SCHD", "VGT", "VXUS", "VUG", # ETFs Calidad
+        "LOW", "ABBV", "SBUX", "TGT", "DHR", "NEE", # Valor y Aristócratas
+        "ASML", "AVGO", "TSM", "NVDA", "ARM",       # Tecnología y Futuro
+        "MCD", "KO", "PEP", "JNJ", "PG", "WMT",     # Consumo Defensivo
+        "V", "MA", "JPM", "BAC", "COST", "SNY"      # Líderes Globales
     ]
     return sorted(list(set(sp500 + especiales)))
+
+all_tickers = get_all_tickers()
 
 @st.cache_data(ttl=3600)
 def fetch_full_data(ticker):
     try:
         stock = yf.Ticker(ticker)
         hist = stock.history(period="2y")
-        if hist.empty or len(hist) < 252: return None
+        if hist.empty or len(hist) < 200: return None
         
         info = stock.info
         hist['MA50'] = ta.sma(hist['Close'], length=50)
@@ -243,43 +246,35 @@ def fetch_full_data(ticker):
         hist = pd.concat([hist, macd, bb], axis=1)
         
         last = hist.iloc[-1]
-        price_now = last['Close']
-        
-        # Cálculo 52 Week Change
-        price_year_ago = hist.iloc[-252]['Close']
-        change_52w = ((price_now - price_year_ago) / price_year_ago) * 100
-        
         net_inc = info.get('netIncomeToCommon', 0)
         mkt_cap = info.get('marketCap', 0)
         de_ratio = info.get('debtToEquity', 0)
 
         return {
-            "Ticker": ticker, 
-            "Precio": round(price_now, 2),
-            "52W Change %": round(change_52w, 2),
-            "RSI(50)": round(last['RSI_50'], 2),
-            "MA50": "🟢" if price_now > last['MA50'] else "🔴",
-            "MA200": "🟢" if price_now > last['MA200'] else "🔴",
+            "Ticker": ticker, "Precio": round(last['Close'], 2),
+            "RSI Anual": round(last['RSI_50'], 2),
+            "MACD": round(last['MACD_12_26_9'], 3), "Señal": round(last['MACDs_12_26_9'], 3),
             "Net Inc(B)": round(net_inc / 1e9, 2) if net_inc else 0,
             "D/E Ratio(%)": round(de_ratio, 2) if de_ratio else 0,
             "Mkt Cap(B)": round(mkt_cap / 1e9, 2) if mkt_cap else 0,
-            "MACD": round(last['MACD_12_26_9'], 3),
             "df": hist
         }
     except: return None
 
 # --- MONITOR DE ESCANEO ---
-all_tickers = get_all_tickers()
 st.subheader(f"🔍 Escaneo de Oportunidades ({len(all_tickers)} activos)")
 
 data_list = []
-if st.checkbox("🚀 Iniciar Escaneo Profundo"):
-    progress_bar = st.progress(0, text="Analizando activos...")
+if st.checkbox("🚀 Iniciar Escaneo Profundo (S&P 500 + Especiales)"):
+    progress_text = "Analizando mercado..."
+    progress_bar = st.progress(0, text=progress_text)
+    
     for i, t in enumerate(all_tickers):
         res = fetch_full_data(t)
         if res:
+            # Aplicar filtros de la barra lateral
             if (res["Mkt Cap(B)"] >= market_cap_min and 
-                res["RSI(50)"] <= rsi_anual_limit and 
+                res["RSI Anual"] <= rsi_anual_limit and 
                 res["Net Inc(B)"] >= min_net_income and 
                 res["D/E Ratio(%)"] <= max_de_ratio):
                 data_list.append(res)
@@ -288,10 +283,9 @@ if st.checkbox("🚀 Iniciar Escaneo Profundo"):
 
 if data_list:
     st.subheader(f"📋 Resultados del Acecho ({len(data_list)})")
-    df_view = pd.DataFrame(data_list).drop(columns=['df'])
-    st.dataframe(df_view, use_container_width=True)
+    st.dataframe(pd.DataFrame(data_list).drop(columns=['df']), use_container_width=True)
 
-    seleccion = st.selectbox("🎯 Selección para Análisis Detallado:", df_view["Ticker"].tolist())
+    seleccion = st.selectbox("🎯 Selección para Análisis Detallado:", [d["Ticker"] for d in data_list])
 
     if seleccion:
         item = next(i for i in data_list if i["Ticker"] == seleccion)
@@ -313,6 +307,7 @@ if data_list:
                 bgcolor="rgba(0,0,0,0.8)", row=row, col=col
             )
 
+        # 1. PRECIO
         fig.add_trace(go.Candlestick(x=df_p.index, open=df_p['Open'], high=df_p['High'], low=df_p['Low'], close=df_p['Close'], name="Precio"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA50'], line=dict(color='cyan', width=1), name="MA50"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA200'], line=dict(color='red', width=2), name="MA200"), row=1, col=1)
@@ -320,16 +315,26 @@ if data_list:
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p[col_bbl], line=dict(color='rgba(173,216,230,0.2)', width=1), fill='tonexty', name="B.Inf"), row=1, col=1)
         
         add_lab(fig, last_p['Close'], f" PRECIO: ${item['Precio']}", "white", 1, 1, 20)
-        
+        add_lab(fig, last_p[col_bbu], f" BS: {round(last_p[col_bbu],2)}", "lightblue", 1, 1, 0)
+        add_lab(fig, last_p[col_bbl], f" BI: {round(last_p[col_bbl],2)}", "lightblue", 1, 1, -20)
+
+        # 2. RSI 50
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['RSI_50'], line=dict(color='#C084FC', width=2), name="RSI 50"), row=2, col=1)
         fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
         fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
-        
+        fig.update_yaxes(range=[0, 100], row=2, col=1)
+        add_lab(fig, last_p['RSI_50'], f" RSI(50): {item['RSI Anual']}", "#C084FC", 2, 1)
+
+        # 3. MACD
         h_colors = ['#26a69a' if v >= 0 else '#ef5350' for v in df_p['MACDh_12_26_9']]
         fig.add_trace(go.Bar(x=df_p.index, y=df_p['MACDh_12_26_9'], marker_color=h_colors, name="Hist"), row=3, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACD_12_26_9'], line=dict(color='#2962ff', width=2), name="MACD"), row=3, col=1)
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACDs_12_26_9'], line=dict(color='#ff6d00', width=2), name="Señal"), row=3, col=1)
+        
+        add_lab(fig, last_p['MACD_12_26_9'], f" M: {item['MACD']}", "#2962ff", 3, 1, 12)
+        add_lab(fig, last_p['MACDs_12_26_9'], f" S: {item['Señal']}", "#ff6d00", 3, 1, -12)
 
         fig.update_layout(height=1000, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(r=160))
         st.plotly_chart(fig, use_container_width=True)
 else:
-    st.info("Utiliza el checkbox para iniciar el análisis.")
+    st.info("Utiliza el checkbox de arriba para escanear el mercado.")
