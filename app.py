@@ -5,14 +5,12 @@ import pandas_ta as ta
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime
-import smtplib
-from email.mime.text import MIMEText
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Terminal Pro - Gabriel Herrera", layout="wide")
 
 if 'last_update' not in st.session_state:
-    st.session_state['last_update'] = datetime.now().strftime("%H:%M:%S")
+   st.session_state['last_update'] = datetime.now().strftime("%H:%M:%S")
 
 st.title("💎 Terminal de Valor y Estrategia de Acecho")
 
@@ -35,18 +33,18 @@ rsi_limit = st.sidebar.slider("Filtro RSI (14) Máx", 10, 100, 65)
 st.sidebar.divider()
 st.sidebar.header("📧 Configuración de Alertas")
 if 'user_email' not in st.session_state:
-    st.session_state['user_email'] = "tu_correo@ejemplo.com" # Cambiar por el predeterminado
+    st.session_state['user_email'] = "gabelohm@live.com"
 
 email_input = st.sidebar.text_input("Configurar correo de destino:", value=st.session_state['user_email'])
 if st.sidebar.button("💾 Actualizar Correo"):
-    st.session_state['user_email'] = email_input
-    st.sidebar.success(f"Registrado: {email_input}")
+   st.session_state['user_email'] = email_input
+   st.sidebar.success(f"Registrado: {email_input}")
 
 st.sidebar.info(f"📍 Correo actual: \n{st.session_state['user_email']}")
 
 if st.sidebar.button('🔄 Refrescar Datos'):
-    st.cache_data.clear()
-    st.session_state['last_update'] = datetime.now().strftime("%H:%M:%S")
+   st.cache_data.clear()
+   st.session_state['last_update'] = datetime.now().strftime("%H:%M:%S")
 
 # --- GESTIÓN DE ACTIVOS ---
 MIS_ACTIVOS_FIJOS = [
@@ -85,21 +83,20 @@ def fetch_full_data(ticker):
         price_now = last['Close']
         c_bbl = [c for c in hist.columns if c.startswith('BBL')][0]
         
-        # Lógica de Alerta (RSI <= 32, MACD bajo, o Precio cerca de Banda Inferior)
         alerta_compra = False
         if last['RSI_14'] <= 32 or price_now <= last[c_bbl] * 1.02 or last['MACD_12_26_9'] <= 0.05:
-            alerta_compra = True
+           alerta_compra = True
 
         def fmt_ma(val, price):
             return f"{'🟢' if price > val else '🔴'} ${round(val, 2)}"
 
         return {
-            "Ticker": ticker, "Precio": round(price_now, 2), "RSI(14)": round(last['RSI_14'], 2),
-            "MA50": fmt_ma(last['MA50'], price_now), "MA125": fmt_ma(last['MA125'], price_now),
-            "MA200": fmt_ma(last['MA200'], price_now),
+           "Ticker": ticker, "Precio": round(price_now, 2), "RSI(14)": round(last['RSI_14'], 2),
+           "MA50": fmt_ma(last['MA50'], price_now), "MA125": fmt_ma(last['MA125'], price_now),
+           "MA200": fmt_ma(last['MA200'], price_now),
             "Net Inc(B)": round(info.get('netIncomeToCommon', 0) / 1e9, 2),
             "D/E Ratio(%)": round(info.get('debtToEquity', 0), 2),
-            "MACD": round(last['MACD_12_26_9'], 3), "Señal": round(last['MACDs_12_26_9'], 3),
+           "MACD": round(last['MACD_12_26_9'], 3), "Señal": round(last['MACDs_12_26_9'], 3),
             "Alerta": "🚨 COMPRA" if alerta_compra else "✅ HOLD",
             "df": hist, "info": info
         }
@@ -114,7 +111,7 @@ if st.checkbox("🚀 Iniciar Escaneo Profundo"):
         res = fetch_full_data(t)
         if res:
             if (res["RSI(14)"] <= rsi_limit and res["Net Inc(B)"] >= min_net_income and res["D/E Ratio(%)"] <= max_de_ratio):
-                data_scan.append(res)
+               data_scan.append(res)
         prog.progress((i + 1) / len(all_tickers))
     prog.empty()
 
@@ -123,7 +120,7 @@ if data_scan:
     st.subheader(f"📋 Resultados del Acecho ({len(data_scan)} activos)")
     st.dataframe(df_view, use_container_width=True)
     
-    # --- 2. GRÁFICAS LIGADAS A LA PRIMERA TABLA ---
+    # --- 2. GRÁFICAS (CON TÍTULOS Y VALORES DINÁMICOS) ---
     seleccion = st.selectbox("🎯 Análisis Técnico Detallado:", df_view["Ticker"].tolist())
     if seleccion:
         item = next(i for i in data_scan if i["Ticker"] == seleccion)
@@ -131,7 +128,16 @@ if data_scan:
         last_p = df_p.iloc[-1]
         c_bbu, c_bbl = [c for c in df_p.columns if c.startswith('BBU')][0], [c for c in df_p.columns if c.startswith('BBL')][0]
 
-        fig = make_subplots(rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.04, row_heights=[0.5, 0.2, 0.3])
+        # Títulos de sub-gráficas agregados aquí
+        fig = make_subplots(
+            rows=3, cols=1, 
+            shared_xaxes=True, 
+            vertical_spacing=0.05,
+            subplot_titles=("Gráfico de Precios y Medias Móviles", "RSI (Momentum)", "MACD (Convergencia/Divergencia)"),
+            row_heights=[0.5, 0.2, 0.3]
+        )
+
+        # Panel 1: Precio y Bandas
         fig.add_trace(go.Candlestick(x=df_p.index, open=df_p['Open'], high=df_p['High'], low=df_p['Low'], close=df_p['Close'], name="Precio"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA50'], line=dict(color='cyan', width=1), name="MA50"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA125'], line=dict(color='orange', width=1), name="MA125"), row=1, col=1)
@@ -139,19 +145,26 @@ if data_scan:
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p[c_bbu], line=dict(color='rgba(255,255,255,0.3)', dash='dot'), name="B.Sup"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p[c_bbl], line=dict(color='rgba(255,255,255,0.3)', dash='dot'), name="B.Inf"), row=1, col=1)
 
-        # Anotaciones escalonadas
-        fig.add_annotation(x=df_p.index[-5], y=last_p['Close'], text=f"PRECIO: ${round(last_p['Close'],2)}", showarrow=True, row=1, col=1, font=dict(color="white"), bgcolor="black")
-        fig.add_annotation(x=df_p.index[-1], y=last_p[c_bbu], text=f"B.SUP: ${round(last_p[c_bbu],2)}", showarrow=False, xanchor="left", xshift=10, row=1, col=1, font=dict(color="#00d4ff"))
-        fig.add_annotation(x=df_p.index[-1], y=last_p[c_bbl], text=f"B.INF: ${round(last_p[c_bbl],2)}", showarrow=False, xanchor="left", xshift=10, row=1, col=1, font=dict(color="#00d4ff"))
+        # Anotaciones Panel 1
+        fig.add_annotation(x=df_p.index[-1], y=last_p['Close'], text=f"PRECIO: ${round(last_p['Close'],2)}", showarrow=True, arrowhead=1, row=1, col=1, font=dict(color="white"), bgcolor="black")
 
-        # RSI y MACD
+        # Panel 2: RSI + Valor (Evitando traslape con xshift)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['RSI_14'], line=dict(color='#C084FC', width=2), name="RSI(14)"), row=2, col=1)
+        fig.add_annotation(x=df_p.index[-1], y=last_p['RSI_14'], text=f" RSI: {round(last_p['RSI_14'], 2)}", showarrow=False, xanchor="left", xshift=10, row=2, col=1, font=dict(color="#C084FC"))
+        fig.add_hline(y=30, line_color="green", line_dash="dash", row=2, col=1)
+        fig.add_hline(y=70, line_color="red", line_dash="dash", row=2, col=1)
+
+        # Panel 3: MACD + Valores (Separados por yshift para no contraporsi)
         hist_colors = ['#26a69a' if v >= 0 else '#ef5350' for v in df_p['MACDh_12_26_9']]
         fig.add_trace(go.Bar(x=df_p.index, y=df_p['MACDh_12_26_9'], marker_color=hist_colors, name="Impulso"), row=3, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACD_12_26_9'], line=dict(color='#2962ff'), name="MACD"), row=3, col=1)
         fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACDs_12_26_9'], line=dict(color='#ff6d00'), name="Señal"), row=3, col=1)
+        
+        # Valores de MACD y Señal con desplazamiento vertical relativo
+        fig.add_annotation(x=df_p.index[-1], y=last_p['MACD_12_26_9'], text=f" MACD: {round(last_p['MACD_12_26_9'], 3)}", showarrow=False, xanchor="left", xshift=10, yshift=10, row=3, col=1, font=dict(color="#2962ff"))
+        fig.add_annotation(x=df_p.index[-1], y=last_p['MACDs_12_26_9'], text=f" SEÑAL: {round(last_p['MACDs_12_26_9'], 3)}", showarrow=False, xanchor="left", xshift=10, yshift=-10, row=3, col=1, font=dict(color="#ff6d00"))
 
-        fig.update_layout(height=1000, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(r=150))
+        fig.update_layout(height=1000, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(r=150, t=50))
         st.plotly_chart(fig, use_container_width=True)
 
 # --- 3. SEGUNDA TABLA: MI PLAN ESTRATÉGICO ---
@@ -169,16 +182,11 @@ for t in MIS_ACTIVOS_FIJOS:
 
 if data_plan:
     df_plan = pd.DataFrame(data_plan).drop(columns=['df', 'info'])
-    
-    # Estilizado de la tabla de plan
     def highlight_alerts(val):
-        color = 'background-color: rgba(255, 75, 75, 0.3)' if val == "🚨 COMPRA" else ''
-        return color
-
+        return 'background-color: rgba(255, 75, 75, 0.3)' if val == "🚨 COMPRA" else ''
     st.dataframe(df_plan.style.applymap(highlight_alerts, subset=['Alerta']), use_container_width=True)
 
     if alertas_detectadas:
         st.warning(f"⚠️ Oportunidades de Compra Detectadas en tu Plan: {', '.join(alertas_detectadas)}")
         if st.button("📧 Enviar Informe de Alertas al Correo"):
-            # Aquí iría la función de smtplib configurada
             st.info(f"Simulando envío a {st.session_state['user_email']}... Informe enviado con éxito.")
