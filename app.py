@@ -35,7 +35,7 @@ def get_all_tickers():
     except:
         sp500 = ["AAPL", "MSFT", "GOOGL", "VOO", "QQQ"]
     
-    especiales = ["SCHD", "VGT", "VXUS", "VUG", "DHR", "KO", "PEP", "COST", "MCHI", "SNY"]
+    especiales = ["SCHD", "VGT", "VXUS", "VUG", "DHR", "KO", "PEP", "COST", "MCHI", "SNY", "TXN", "JPM", "V", "MA"]
     return sorted(list(set(sp500 + especiales)))
 
 @st.cache_data(ttl=3600)
@@ -63,7 +63,6 @@ def fetch_full_data(ticker):
         price_year_ago = hist.iloc[-252]['Close']
         change_52w = ((price_now - price_year_ago) / price_year_ago) * 100
         
-        # Formateo de Medias para Tabla
         def fmt_ma(val, price):
             icon = "🟢" if price > val else "🔴"
             return f"{icon} ${round(val, 2)}"
@@ -76,7 +75,7 @@ def fetch_full_data(ticker):
             "MA50": fmt_ma(last['MA50'], price_now),
             "MA125": fmt_ma(last['MA125'], price_now),
             "MA200": fmt_ma(last['MA200'], price_now),
-            "Net Inc(B)": round(info.get('netIncomeToCommon', 0) / 1e9, 2),
+            "Net Inc(B)": round(info.get('netIncomeToCommon', 0) / 1e9, 2) if info.get('netIncomeToCommon') else 0,
             "D/E Ratio(%)": round(info.get('debtToEquity', 0), 2),
             "MACD": round(last['MACD_12_26_9'], 3),
             "Señal": round(last['MACDs_12_26_9'], 3),
@@ -87,7 +86,7 @@ def fetch_full_data(ticker):
 # --- ESCANEO ---
 all_tickers = get_all_tickers()
 data_list = []
-if st.checkbox("🚀 Iniciar Escaneo de Oportunidades"):
+if st.checkbox("🚀 Iniciar Escaneo Profundo"):
     prog = st.progress(0)
     for i, t in enumerate(all_tickers):
         res = fetch_full_data(t)
@@ -106,39 +105,42 @@ if data_list:
         df_p = item["df"].tail(252)
         last_p = df_p.iloc[-1]
         
-        # Dinámica de nombres de columnas Bollinger
-        c_bbu = [c for c in df_p.columns if c.startswith('BBU')][0]
-        c_bbl = [c for c in df_p.columns if c.startswith('BBL')][0]
+        c_bbu, c_bbl = [c for c in df_p.columns if c.startswith('BBU')][0], [c for c in df_p.columns if c.startswith('BBL')][0]
 
-        fig = make_subplots(rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.5, 0.2, 0.3])
+        fig = make_subplots(rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.04, row_heights=[0.5, 0.2, 0.3])
         
-        # Auxiliar para etiquetas en gráfico
         def add_v_lab(fig, y, text, color, row, offset=0):
-            fig.add_annotation(x=df_p.index[-1], y=y, text=text, showarrow=False, xanchor="left", xshift=10, 
-                               yshift=offset, font=dict(color=color, size=11), bgcolor="rgba(0,0,0,0.6)", row=row, col=1)
+            fig.add_annotation(x=df_p.index[-1], y=y, text=text, showarrow=False, xanchor="left", xshift=12, 
+                               yshift=offset, font=dict(color=color, size=13, family="Arial Black"), 
+                               bgcolor="rgba(0,0,0,0.7)", row=row, col=1)
 
         # 1. PRECIO + MAs + BOLLINGER
         fig.add_trace(go.Candlestick(x=df_p.index, open=df_p['Open'], high=df_p['High'], low=df_p['Low'], close=df_p['Close'], name="Precio"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA50'], line=dict(color='cyan', width=1), name="MA50"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA200'], line=dict(color='red', width=1.5), name="MA200"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df_p.index, y=df_p[c_bbu], line=dict(color='gray', dash='dot'), name="B.Sup"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df_p.index, y=df_p[c_bbl], line=dict(color='gray', dash='dot'), name="B.Inf"), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA50'], line=dict(color='cyan', width=1.5), name="MA50"), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA200'], line=dict(color='red', width=2), name="MA200"), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p[c_bbu], line=dict(color='rgba(255,255,255,0.3)', dash='dot'), name="B.Sup"), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p[c_bbl], line=dict(color='rgba(255,255,255,0.3)', dash='dot'), name="B.Inf"), row=1, col=1)
         
-        add_v_lab(fig, last_p['Close'], f"Precio: ${round(last_p['Close'],2)}", "white", 1, 20)
-        add_v_lab(fig, last_p[c_bbu], f"B.Sup: ${round(last_p[c_bbu],2)}", "gray", 1, 0)
-        add_v_lab(fig, last_p[c_bbl], f"B.Inf: ${round(last_p[c_bbl],2)}", "gray", 1, -20)
+        # Etiquetas sin sobreposición (Panel 1)
+        add_v_lab(fig, last_p['Close'], f" PRECIO: ${round(last_p['Close'],2)}", "white", 1, 25)
+        add_v_lab(fig, last_p[c_bbu], f" B.SUP: ${round(last_p[c_bbu],2)}", "#00d4ff", 1, 0)
+        add_v_lab(fig, last_p[c_bbl], f" B.INF: ${round(last_p[c_bbl],2)}", "#00d4ff", 1, -25)
 
         # 2. RSI
-        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['RSI_50'], line=dict(color='#C084FC'), name="RSI"), row=2, col=1)
-        add_v_lab(fig, last_p['RSI_50'], f"RSI: {round(last_p['RSI_50'],2)}", "#C084FC", 2)
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['RSI_50'], line=dict(color='#C084FC', width=2), name="RSI"), row=2, col=1)
+        add_v_lab(fig, last_p['RSI_50'], f" RSI: {round(last_p['RSI_50'],2)}", "#C084FC", 2)
         fig.add_hline(y=30, line_color="green", line_dash="dash", row=2, col=1)
         fig.add_hline(y=70, line_color="red", line_dash="dash", row=2, col=1)
 
-        # 3. MACD + SEÑAL
-        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACD_12_26_9'], line=dict(color='#2962ff'), name="MACD"), row=3, col=1)
-        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACDs_12_26_9'], line=dict(color='#ff6d00'), name="Señal"), row=3, col=1)
-        add_v_lab(fig, last_p['MACD_12_26_9'], f"MACD: {round(last_p['MACD_12_26_9'],3)}", "#2962ff", 3, 10)
-        add_v_lab(fig, last_p['MACDs_12_26_9'], f"Señal: {round(last_p['MACDs_12_26_9'],3)}", "#ff6d00", 3, -10)
+        # 3. MACD + SEÑAL + HISTOGRAMA (Estilo Yahoo Finance)
+        hist_col = ['#26a69a' if v >= 0 else '#ef5350' for v in df_p['MACDh_12_26_9']]
+        fig.add_trace(go.Bar(x=df_p.index, y=df_p['MACDh_12_26_9'], marker_color=hist_col, name="Histograma"), row=3, col=1)
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACD_12_26_9'], line=dict(color='#2962ff', width=2), name="MACD"), row=3, col=1)
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACDs_12_26_9'], line=dict(color='#ff6d00', width=2), name="Señal"), row=3, col=1)
+        
+        # Etiquetas sin sobreposición (Panel 3)
+        add_v_lab(fig, last_p['MACD_12_26_9'], f" MACD: {round(last_p['MACD_12_26_9'],3)}", "#2962ff", 3, 15)
+        add_v_lab(fig, last_p['MACDs_12_26_9'], f" SEÑAL: {round(last_p['MACDs_12_26_9'],3)}", "#ff6d00", 3, -15)
 
-        fig.update_layout(height=900, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(r=150))
+        fig.update_layout(height=1000, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(r=180))
         st.plotly_chart(fig, use_container_width=True)
