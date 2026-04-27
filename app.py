@@ -5,6 +5,9 @@ import pandas_ta as ta
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Terminal Pro - Gabriel Herrera", layout="wide")
@@ -18,17 +21,17 @@ st.title("💎 Terminal de Valor y Estrategia de Acecho")
 with st.expander("📖 MANUAL DE INTERPRETACIÓN: RADIOGRAFÍA TÉCNICA Y FUNDAMENTAL"):
     st.markdown("""
     * **MA50/125/200**: Representan tendencias de corto, mediano y largo plazo.
-    * **RSI (14)**: Momentum de corto plazo. < 32 se considera zona de acecho (sobreventa).
-    * **MACD & Señal**: Cruce alcista indica momentum. Valores cerca de cero sugieren consolidación.
-    * **Bandas de Bollinger**: El precio cerca de la banda inferior (-5%) indica soporte potencial.
+    * **RSI (14)**: Momentum de corto plazo. < 32 indica zona de "Acecho" (sobreventa).
+    * **MACD & Señal**: El cruce indica momentum. Valores cerca de cero sugieren consolidación.
+    * **Banda Inferior**: El precio a menos del 5% de la banda indica proximidad a soporte dinámico.
+    * **Debt/Equity**: Evalúa el apalancamiento para estabilidad financiera.
     """)
 
-# --- BARRA LATERAL: CORREO Y ALERTAS ---
+# --- BARRA LATERAL: CONFIGURACIÓN Y PARÁMETROS ---
 st.sidebar.header("📧 Configuración de Avisos")
-# Espacio para indicar y ver el correo registrado
-email_input = st.sidebar.text_input("Indicar correo para alertas:", placeholder="tu-correo@ejemplo.com")
-if email_input:
-    st.sidebar.info(f"Registrado: {email_input}")
+email_destino = st.sidebar.text_input("Indicar correo para alertas:", placeholder="tu-correo@ejemplo.com")
+if email_destino:
+    st.sidebar.success(f"Correo registrado: {email_destino}")
 
 st.sidebar.divider()
 st.sidebar.header("⚙️ Parámetros de Ingeniería")
@@ -42,6 +45,12 @@ if st.sidebar.button('🔄 Refrescar Datos'):
     st.session_state['last_update'] = datetime.now().strftime("%H:%M:%S")
 
 # --- GESTIÓN DE ACTIVOS ---
+MIS_ACTIVOS_ESTRATEGICOS = [
+    "VOO", "SCHD", "VGT", "VXUS", "VUG", "QQQ", "KO", "PEP", "WMT", "PG", 
+    "O", "CVX", "JNJ", "MCD", "JPM", "XOM", "V", "ASML", "BHP", "ABBV", 
+    "SBUX", "LOW", "AVGO", "NEE", "TXN", "GOOG", "MSFT"
+]
+
 @st.cache_data(ttl=86400)
 def get_sp500_tickers():
     try:
@@ -50,13 +59,6 @@ def get_sp500_tickers():
         return [s.replace('.', '-') for s in sp500]
     except:
         return ["AAPL", "MSFT", "GOOGL"]
-
-# Tu lista específica de activos poseídos o deseados
-MIS_ACTIVOS_ESTRATEGICOS = [
-    "VOO", "SCHD", "VGT", "VXUS", "VUG", "QQQ", "KO", "PEP", "WMT", "PG", 
-    "O", "CVX", "JNJ", "MCD", "JPM", "XOM", "V", "ASML", "BHP", "ABBV", 
-    "SBUX", "LOW", "AVGO", "NEE", "TXN", "GOOG", "MSFT"
-]
 
 @st.cache_data(ttl=3600)
 def fetch_full_data(ticker):
@@ -114,11 +116,21 @@ with st.spinner("Actualizando mi cartera..."):
 
 if cartera_list:
     df_cartera = pd.DataFrame(cartera_list).drop(columns=['df'])
-    # Resaltar filas en zona de acecho
+    
+    # Corrección del error: .map en lugar de .applymap
     def highlight_acecho(val):
-        color = 'background-color: rgba(255, 75, 75, 0.2)' if val == "🚨 ACECHO" else ''
-        return color
-    st.dataframe(df_cartera.style.applymap(highlight_acecho, subset=['Alerta']), use_container_width=True)
+        return 'background-color: rgba(255, 75, 75, 0.2)' if val == "🚨 ACECHO" else ''
+    
+    st.dataframe(df_cartera.style.map(highlight_acecho, subset=['Alerta']), use_container_width=True)
+
+# --- BOTÓN DE ENVÍO DE ALERTA ---
+if st.sidebar.button("📧 Enviar Reporte de Acecho"):
+    activos_alerta = df_cartera[df_cartera['Alerta'] == "🚨 ACECHO"]
+    if not activos_alerta.empty and email_destino:
+        st.sidebar.success(f"Simulación: Reporte enviado a {email_destino}")
+        # Aquí se integraría la lógica de smtplib para el envío real
+    else:
+        st.sidebar.warning("No hay activos en zona de acecho o falta el correo.")
 
 # --- SECCIÓN 2: ESCANEO DE MERCADO ---
 st.divider()
@@ -143,45 +155,45 @@ if st.checkbox("🚀 Iniciar Escaneo de Mercado (S&P 500 + Especiales)"):
 
 # --- SECCIÓN 3: GRÁFICAS DETALLADAS ---
 st.divider()
-todos_disponibles = sorted(list(set([d['Ticker'] for d in cartera_list])))
-seleccion = st.selectbox("📊 Ver Gráfica Detallada:", todos_disponibles)
+seleccion = st.selectbox("📊 Ver Gráfica Detallada:", MIS_ACTIVOS_ESTRATEGICOS)
 
 if seleccion:
-    item = next(i for i in cartera_list if i["Ticker"] == seleccion)
-    df_p = item["df"].tail(252)
-    last_p = df_p.iloc[-1]
-    
-    c_bbu = [c for c in df_p.columns if c.startswith('BBU')][0]
-    c_bbl = [c for c in df_p.columns if c.startswith('BBL')][0]
+    item = next((i for i in cartera_list if i["Ticker"] == seleccion), None)
+    if item:
+        df_p = item["df"].tail(252)
+        last_p = df_p.iloc[-1]
+        
+        c_bbu = [c for c in df_p.columns if c.startswith('BBU')][0]
+        c_bbl = [c for c in df_p.columns if c.startswith('BBL')][0]
 
-    fig = make_subplots(rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.04, 
-                       row_heights=[0.5, 0.2, 0.3])
-    
-    # 1. PRECIO
-    fig.add_trace(go.Candlestick(x=df_p.index, open=df_p['Open'], high=df_p['High'], 
-                                 low=df_p['Low'], close=df_p['Close'], name="Precio"), row=1, col=1)
-    fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA50'], line=dict(color='cyan', width=1), name="MA50"), row=1, col=1)
-    fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA125'], line=dict(color='orange', width=1), name="MA125"), row=1, col=1)
-    fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA200'], line=dict(color='red', width=2), name="MA200"), row=1, col=1)
-    fig.add_trace(go.Scatter(x=df_p.index, y=df_p[c_bbu], line=dict(color='rgba(255,255,255,0.2)', dash='dot'), name="B.Sup"), row=1, col=1)
-    fig.add_trace(go.Scatter(x=df_p.index, y=df_p[c_bbl], line=dict(color='rgba(255,255,255,0.2)', dash='dot'), name="B.Inf"), row=1, col=1)
+        fig = make_subplots(rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.04, 
+                           row_heights=[0.5, 0.2, 0.3])
+        
+        # 1. PANEL PRINCIPAL (Precio, MAs, Bollinger)
+        fig.add_trace(go.Candlestick(x=df_p.index, open=df_p['Open'], high=df_p['High'], 
+                                     low=df_p['Low'], close=df_p['Close'], name="Precio"), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA50'], line=dict(color='cyan', width=1), name="MA50"), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA125'], line=dict(color='orange', width=1), name="MA125"), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MA200'], line=dict(color='red', width=2), name="MA200"), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p[c_bbu], line=dict(color='rgba(255,255,255,0.2)', dash='dot'), name="B.Sup"), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p[c_bbl], line=dict(color='rgba(255,255,255,0.2)', dash='dot'), name="B.Inf"), row=1, col=1)
 
-    # Anotaciones escalonadas
-    fig.add_annotation(x=df_p.index[-5], y=last_p['Close'], text=f"PRECIO: ${round(last_p['Close'],2)}", 
-                       showarrow=True, arrowhead=1, row=1, col=1, font=dict(color="white"), bgcolor="black")
-    fig.add_annotation(x=df_p.index[-1], y=last_p[c_bbl], text=f"B.INF: ${round(last_p[c_bbl],2)}", 
-                       showarrow=False, xanchor="left", xshift=10, row=1, col=1, font=dict(color="#00d4ff"))
+        # Anotaciones escalonadas para evitar solapamiento
+        fig.add_annotation(x=df_p.index[-5], y=last_p['Close'], text=f"PRECIO: ${round(last_p['Close'],2)}", 
+                           showarrow=True, arrowhead=1, row=1, col=1, font=dict(color="white"), bgcolor="black")
+        fig.add_annotation(x=df_p.index[-1], y=last_p[c_bbl], text=f"B.INF: ${round(last_p[c_bbl],2)}", 
+                           showarrow=False, xanchor="left", xshift=10, row=1, col=1, font=dict(color="#00d4ff"))
 
-    # 2. RSI (14)
-    fig.add_trace(go.Scatter(x=df_p.index, y=df_p['RSI_14'], line=dict(color='#C084FC', width=2), name="RSI(14)"), row=2, col=1)
-    fig.add_hline(y=32, line_color="orange", line_dash="dash", row=2, col=1)
-    fig.add_hline(y=70, line_color="red", line_dash="dash", row=2, col=1)
+        # 2. PANEL RSI (14) con línea de aviso
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['RSI_14'], line=dict(color='#C084FC', width=2), name="RSI(14)"), row=2, col=1)
+        fig.add_hline(y=32, line_color="orange", line_dash="dash", row=2, col=1)
+        fig.add_hline(y=70, line_color="red", line_dash="dash", row=2, col=1)
 
-    # 3. MACD
-    hist_colors = ['#26a69a' if v >= 0 else '#ef5350' for v in df_p['MACDh_12_26_9']]
-    fig.add_trace(go.Bar(x=df_p.index, y=df_p['MACDh_12_26_9'], marker_color=hist_colors, name="Impulso"), row=3, col=1)
-    fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACD_12_26_9'], line=dict(color='#2962ff'), name="MACD"), row=3, col=1)
-    fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACDs_12_26_9'], line=dict(color='#ff6d00'), name="Señal"), row=3, col=1)
+        # 3. PANEL MACD (Histograma + Líneas)
+        hist_colors = ['#26a69a' if v >= 0 else '#ef5350' for v in df_p['MACDh_12_26_9']]
+        fig.add_trace(go.Bar(x=df_p.index, y=df_p['MACDh_12_26_9'], marker_color=hist_colors, name="Impulso"), row=3, col=1)
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACD_12_26_9'], line=dict(color='#2962ff'), name="MACD"), row=3, col=1)
+        fig.add_trace(go.Scatter(x=df_p.index, y=df_p['MACDs_12_26_9'], line=dict(color='#ff6d00'), name="Señal"), row=3, col=1)
 
-    fig.update_layout(height=1000, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(r=150))
-    st.plotly_chart(fig, use_container_width=True)
+        fig.update_layout(height=1000, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(r=150))
+        st.plotly_chart(fig, use_container_width=True)
