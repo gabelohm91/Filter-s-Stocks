@@ -201,10 +201,10 @@ with st.expander("📖 MANUAL DE INTERPRETACIÓN: RADIOGRAFÍA TÉCNICA Y FUNDAM
 
 # --- BARRA LATERAL ---
 st.sidebar.header("⚙️ Parámetros de Ingeniería")
-market_cap_min = st.sidebar.number_input("Market Cap Mín (Billones $)", value=20)
-min_net_income = st.sidebar.number_input("Net Income Mínimo (Billones $)", value=0)
-max_de_ratio = st.sidebar.slider("Debt/Equity Máximo (%)", 0, 400, 150)
-rsi_limit = st.sidebar.slider("Filtro RSI (14) Máx", 10, 100, 65)
+market_cap_min = st.sidebar.number_input("Market Cap Mín (Billones $)", value=10)
+min_net_income = st.sidebar.number_input("Net Income Mínimo (Billones $)", value=0.1)
+max_de_ratio = st.sidebar.slider("Debt/Equity Máximo (%)", 0, 400, 120)
+rsi_limit = st.sidebar.slider("Filtro RSI (14) Máx", 10, 100, 45)
 
 st.sidebar.divider()
 st.sidebar.header("📧 Configuración de Alertas")
