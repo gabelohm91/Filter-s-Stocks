@@ -391,3 +391,79 @@ if data_plan:
 # Indicador de estado en la barra lateral
 st.sidebar.divider()
 st.sidebar.write(f"📅 Auto-envío: {'✅ Realizado' if st.session_state['email_enviado_hoy'] == datetime.now().strftime('%Y-%m-%d') else '⏳ Programado 12:00 PM'}")
+
+# --- BLOQUE DE CONTEXTO MACROECONÓMICO (FRED) ---
+st.divider()
+st.header("🌍 Monitor Macro: Radar de Recesión")
+
+import pandas_datareader.data as web
+from datetime import datetime, timedelta
+
+@st.cache_data(ttl=86400)
+def fetch_macro_data():
+    try:
+        end = datetime.now()
+        start = end - timedelta(days=365)
+        
+        # Series de FRED: 
+        # UNRATE (Desempleo), FEDFUNDS (Tasas), T10Y2Y (Curva de Rendimiento)
+        series = {'UNRATE': 'Desempleo (%)', 'FEDFUNDS': 'Tasas Fed (%)', 'T10Y2Y': 'Curva 10Y-2Y'}
+        df_macro = web.DataReader(list(series.keys()), 'fred', start, end)
+        df_macro.rename(columns=series, inplace=True)
+        return df_macro.ffill()
+    except Exception as e:
+        return None
+
+macro_data = fetch_macro_data()
+
+if macro_data is not None:
+    latest = macro_data.iloc[-1]
+    prev_month = macro_data.iloc[-20] if len(macro_data) > 20 else macro_data.iloc[0]
+    
+    col_m1, col_m2, col_m3 = st.columns(3)
+    
+    # 1. Curva de Rendimiento (El predictor #1 de recesiones)
+    with col_m1:
+        spread = latest['Curva 10Y-2Y']
+        delta_spread = spread - prev_month['Curva 10Y-2Y']
+        status_yield = "🔴 INVERTIDA (Riesgo)" if spread < 0 else "🟢 NORMAL"
+        st.metric("Curva 10Y-2Y", f"{round(spread, 2)}", f"{round(delta_spread, 2)}", 
+                  help="Si es negativa (inversión), históricamente precede a una recesión en 12-18 meses.")
+        st.markdown(f"**Estado:** {status_yield}")
+
+    # 2. Desempleo
+    with col_m2:
+        unemp = latest['Desempleo (%)']
+        delta_unemp = unemp - prev_month['Desempleo (%)']
+        # Lógica simple inspirada en la Regla de Sahm
+        status_unemp = "⚠️ Subiendo" if delta_unemp > 0.3 else "✅ Estable/Bajo"
+        st.metric("Desempleo (EE.UU.)", f"{unemp}%", f"{round(delta_unemp, 2)}", delta_color="inverse")
+        st.markdown(f"**Estado:** {status_unemp}")
+
+    # 3. Tasas de Interés
+    with col_m3:
+        rates = latest['Tasas Fed (%)']
+        delta_rates = rates - prev_month['Tasas Fed (%)']
+        status_rates = "💸 Restrictiva" if rates > 4 else "💰 Acomodaticia"
+        st.metric("Tasas Fed Funds", f"{rates}%", f"{round(delta_rates, 2)}", delta_color="inverse")
+        st.markdown(f"**Estado:** {status_rates}")
+
+    # --- SEÑAL DE ALERTA GLOBAL ---
+    recession_risk = 0
+    if spread < 0: recession_risk += 50
+    if delta_unemp > 0.5: recession_risk += 30
+    if rates > 5: recession_risk += 20
+
+    st.divider()
+    if recession_risk >= 50:
+        st.error(f"🚨 **ALERTA DE ESTRATEGIA:** Riesgo de Recesión Elevado ({recession_risk}%). Priorizar activos defensivos (KO, PEP, PG) y cash.")
+    elif recession_risk >= 30:
+        st.warning(f"⚠️ **MODO CAUTELA:** Indicadores macro mixtos. Evitar apalancamiento excesivo.")
+    else:
+        st.success("☀️ **ENTORNO FAVORABLE:** Los indicadores macro no muestran señales de recesión inminente.")
+
+    # Gráfico pequeño de la Curva de Rendimiento para ver la tendencia
+    st.subheader("Evolución de la Curva 10Y-2Y (Último Año)")
+    st.line_chart(macro_data['Curva 10Y-2Y'])
+else:
+    st.error("No se pudo conectar con FRED. Verifica tu conexión o intenta más tarde.")
