@@ -470,14 +470,15 @@ if macro_data is not None:
     else:
         st.success(f"☀️ **ENTORNO SEGURO:** Riesgo bajo ({risk_score}%).")
 
-    # 4. GRÁFICA DINÁMICA CON DESPLEGABLE
+   # 4. GRÁFICA DINÁMICA CON DESPLEGABLE (Versión Lineal)
     st.subheader("Análisis Histórico")
     opcion_grafica = st.selectbox(
         "Selecciona el indicador para visualizar:",
         ("Curva 10Y-2Y", "Desempleo (%)", "Tasas Fed (%)")
     )
     
-    # Colores dinámicos para que la gráfica combine con el indicador
+    # Mapa de colores para mantener la coherencia visual
     color_map = {"Curva 10Y-2Y": "#1f77b4", "Desempleo (%)": "#ff7f0e", "Tasas Fed (%)": "#d62728"}
     
-    st.area_chart(macro_data[opcion_grafica], color=color_map[opcion_grafica])
+    # Cambiamos st.area_chart por st.line_chart
+    st.line_chart(macro_data[opcion_grafica], color=color_map[opcion_grafica])
