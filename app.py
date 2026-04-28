@@ -400,18 +400,14 @@ st.header("🌍 Monitor Macro: Radar de Recesión")
 @st.cache_data(ttl=86400)
 def fetch_macro_data_direct():
     try:
-        # URLs directas de descarga de FRED para evitar librerías obsoletas
         base_url = "https://fred.stlouisfed.org/graph/fredgraph.csv?id="
-        
-        # Descargamos las 3 series clave
         unrate = pd.read_csv(f"{base_url}UNRATE", index_col=0, parse_dates=True)
         fedfunds = pd.read_csv(f"{base_url}FEDFUNDS", index_col=0, parse_dates=True)
         yield_curr = pd.read_csv(f"{base_url}T10Y2Y", index_col=0, parse_dates=True)
         
-        # Combinamos todo en un solo DataFrame
         df = pd.concat([unrate, fedfunds, yield_curr], axis=1)
         df.columns = ['Desempleo (%)', 'Tasas Fed (%)', 'Curva 10Y-2Y']
-        return df.ffill().tail(252) # Último año de datos
+        return df.ffill().tail(252) # Último año para contexto
     except Exception as e:
         st.error(f"Error al conectar con FRED: {e}")
         return None
@@ -420,40 +416,68 @@ macro_data = fetch_macro_data_direct()
 
 if macro_data is not None:
     latest = macro_data.iloc[-1]
-    # Comparamos contra el valor de hace ~30 días para la métrica
     prev = macro_data.iloc[-22] if len(macro_data) > 22 else macro_data.iloc[0]
     
-    col_m1, col_m2, col_m3 = st.columns(3)
+    # 1. CÁLCULO DE RIESGO ESCALONADO
+    risk_score = 0
     
+    # Desempleo (Sahm Progresivo)
+    unemp = latest['Desempleo (%)']
+    unemp_min_year = macro_data['Desempleo (%)'].min()
+    unemp_diff = unemp - unemp_min_year
+    if unemp_diff >= 0.5: risk_score += 40
+    elif unemp_diff >= 0.3: risk_score += 20
+
+    # Curva (Proximidad a Inversión)
+    spread = latest['Curva 10Y-2Y']
+    if spread < 0: risk_score += 40
+    elif spread < 0.10: risk_score += 20
+
+    # Tasas (Presión o Caída de Pánico)
+    rates = latest['Tasas Fed (%)']
+    rates_3m_ago = macro_data['Tasas Fed (%)'].iloc[-3] if len(macro_data) > 3 else rates
+    rates_drop = rates_3m_ago - rates
+    
+    status_rates = "💰 Acomodaticia"
+    if rates > 5.0:
+        risk_score += 20
+        status_rates = "💸 Restrictiva"
+    elif rates_drop >= 0.50:
+        risk_score += 20
+        status_rates = "🚨 Caída Brusca (Pánico)"
+    elif rates > 4.0:
+        risk_score += 10
+        status_rates = "📊 Presión Moderada"
+
+    # 2. VISUALIZACIÓN DE MÉTRICAS
+    col_m1, col_m2, col_m3 = st.columns(3)
     with col_m1:
-        spread = latest['Curva 10Y-2Y']
         st.metric("Curva 10Y-2Y", f"{round(spread, 2)}", f"{round(spread - prev['Curva 10Y-2Y'], 2)}")
         st.markdown(f"**Estado:** {'🔴 INVERTIDA' if spread < 0 else '🟢 NORMAL'}")
-
     with col_m2:
-        unemp = latest['Desempleo (%)']
-        diff_unemp = unemp - prev['Desempleo (%)']
-        st.metric("Desempleo EE.UU.", f"{unemp}%", f"{round(diff_unemp, 2)}", delta_color="inverse")
-        st.markdown(f"**Estado:** {'⚠️ Subiendo' if diff_unemp > 0.2 else '✅ Estable'}")
-
+        st.metric("Desempleo EE.UU.", f"{unemp}%", f"{round(unemp - prev['Desempleo (%)'], 2)}", delta_color="inverse")
+        st.markdown(f"**Estado:** {'⚠️ Subiendo' if unemp_diff >= 0.3 else '✅ Estable'}")
     with col_m3:
-        rates = latest['Tasas Fed (%)']
-        st.metric("Tasas Fed Funds", f"{rates}%", f"{round(rates - prev['Tasas Fed (%)'], 2)}", delta_color="inverse")
-        st.markdown(f"**Estado:** {'💸 Restrictiva' if rates > 4 else '💰 Acomodaticia'}")
+        st.metric("Tasas Fed Funds", f"{rates}%", f"{round(-rates_drop, 2)}", delta_color="inverse")
+        st.markdown(f"**Estado:** {status_rates}")
 
-    # Lógica de Riesgo (40/40/20)
-    risk_score = 0
-    if spread < 0: risk_score += 40
-    if (unemp - macro_data['Desempleo (%)'].min()) > 0.3: risk_score += 40
-    if rates > 5: risk_score += 20
-
+    # 3. BANNER DE RIESGO
     st.divider()
     if risk_score >= 70:
-        st.error(f"🚨 **ALERTA MÁXIMA:** Riesgo de Recesión en {risk_score}%. Protege capital.")
+        st.error(f"🚨 **ALERTA MÁXIMA:** Riesgo de Recesión en {risk_score}%.")
     elif risk_score >= 40:
         st.warning(f"⚠️ **PRECAUCIÓN:** Riesgo Moderado ({risk_score}%).")
     else:
         st.success(f"☀️ **ENTORNO SEGURO:** Riesgo bajo ({risk_score}%).")
 
-    st.subheader("Evolución de la Curva (10Y - 2Y)")
-    st.line_chart(macro_data['Curva 10Y-2Y'])
+    # 4. GRÁFICA DINÁMICA CON DESPLEGABLE
+    st.subheader("Análisis Histórico")
+    opcion_grafica = st.selectbox(
+        "Selecciona el indicador para visualizar:",
+        ("Curva 10Y-2Y", "Desempleo (%)", "Tasas Fed (%)")
+    )
+    
+    # Colores dinámicos para que la gráfica combine con el indicador
+    color_map = {"Curva 10Y-2Y": "#1f77b4", "Desempleo (%)": "#ff7f0e", "Tasas Fed (%)": "#d62728"}
+    
+    st.area_chart(macro_data[opcion_grafica], color=color_map[opcion_grafica])
