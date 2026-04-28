@@ -5,6 +5,7 @@ import pandas_ta as ta
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime
+import pandas_datareader.data as web
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Terminal Pro - Gabriel Herrera", layout="wide")
@@ -396,7 +397,6 @@ st.sidebar.write(f"📅 Auto-envío: {'✅ Realizado' if st.session_state['email
 st.divider()
 st.header("🌍 Monitor Macro: Radar de Recesión")
 
-import pandas_datareader.data as web
 from datetime import datetime, timedelta
 
 @st.cache_data(ttl=86400)
