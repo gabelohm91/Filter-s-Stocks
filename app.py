@@ -227,7 +227,10 @@ if st.sidebar.button('🔄 Refrescar Datos'):
 MIS_ACTIVOS_FIJOS = [
     "VOO", "SCHD", "VGT", "VXUS", "VUG", "QQQ", "KO", "PEP", "WMT", "PG", 
     "O", "CVX", "JNJ", "MCD", "JPM", "XOM", "V", "ASML", "BHP", "ABBV", 
-    "SBUX", "LOW", "AVGO", "NEE", "TXN", "GOOG", "MSFT", "DHR", "COST"
+    "SBUX", "LOW", "AVGO", "NEE", "TXN", "GOOG", "MSFT", "DHR", "COST",
+   "VT", "VYMI", "VIG", "MCHI", "BAC", "ADC", "VICI", "CSCO", "HPQ",
+   "HPE", "JCI", "HON", "PFE", "CAT", "TGT", "APD", "KMB", "QCOM",
+   "ACN", "GE", "MDT", "NEE", "SONY", "NTDOY"
 ]
 
 @st.cache_data(ttl=86400)
