@@ -18,7 +18,7 @@ if 'email_enviado_hoy' not in st.session_state:
 st.title("💎 Terminal de Valor y Estrategia de Acecho")
 
 with st.expander("📖 MANUAL DE INTERPRETACIÓN: RADIOGRAFÍA TÉCNICA Y FUNDAMENTAL"):
-    tab1, tab2, tab3 = st.tabs(["📈 Análisis Técnico", "💰 Análisis Fundamental", "🧭 Guía Rápida de Señales"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📈 Análisis Técnico", "💰 Análisis Fundamental", "🧭 Guía Rápida de Señales", "🌍 Contexto Macro"])
 
     with tab1:
         st.markdown("## Indicadores Técnicos")
@@ -157,6 +157,62 @@ with st.expander("📖 MANUAL DE INTERPRETACIÓN: RADIOGRAFÍA TÉCNICA Y FUNDAM
             - D/E **< 100%**
             - Golden Cross
             """)
+            with tab4:
+        st.markdown("## 🌍 Indicadores Macroeconómicos")
+
+        st.markdown("### 📉 Curva 10Y-3M (Spread de Tasas)")
+        st.markdown("""
+        Mide la diferencia entre el rendimiento del Bono del Tesoro a 10 años y la Letra del Tesoro a 3 meses.
+        Es el indicador oficial usado por el **Banco de la Reserva Federal de Nueva York** en su modelo de probabilidad de recesión — más fiable históricamente que el spread 10Y-2Y.
+
+        | Valor | Interpretación |
+        |-------|----------------|
+        | **> 0.5%** | 🟢 Curva normal. Crecimiento saludable esperado. |
+        | **0.10% – 0.5%** | 🟡 Aplanamiento. Empieza a descontarse menor crecimiento. |
+        | **0% – 0.10%** | 🟠 Zona de alerta. Inversión inminente. |
+        | **< 0%** | 🔴 **Curva invertida.** El mercado espera que la Fed recorte tasas porque anticipa desaceleración. |
+
+        **Cómo leerla en el tiempo (lo más importante):**
+        - 🔻 **Cruce a negativo:** Señal de alerta temprana. Históricamente precede una recesión entre **6 y 18 meses** después — no es inmediato.
+        - 🔺 **Rebote de negativo a positivo ("un-inversión"):** ⚠️ Contraintuitivo — esto **no significa que el peligro pasó**. Suele coincidir con el inicio real de la recesión, porque ocurre cuando la Fed empieza a recortar tasas agresivamente ante un deterioro económico que ya está en marcha. Este es históricamente uno de los mejores momentos para *comprar* activos de calidad a precios deprimidos, no para confiarse.
+        - 📊 La curva mide *probabilidad* de recesión, no su severidad ni duración.
+        """)
+
+        st.divider()
+
+        st.markdown("### 👷 Desempleo (Tasa de Desempleo EE.UU.)")
+        st.markdown("""
+        Mide el porcentaje de la fuerza laboral sin trabajo. Es un indicador **rezagado**: sube *después* de que la economía ya se debilitó, no antes.
+
+        | Comportamiento | Interpretación |
+        |-----------------|----------------|
+        | **Estable o bajando** | ✅ Mercado laboral fuerte. Consumo sostenido. |
+        | **Sube +0.3 puntos desde el mínimo del año** | 🟡 Primeras señales de debilitamiento. |
+        | **Sube +0.5 puntos desde el mínimo del año** | 🔴 Señal de recesión en curso (similar a la "Regla de Sahm"). |
+
+        > 💡 El desempleo no predice la recesión — la **confirma**. Cuando ya está subiendo de forma sostenida, la economía probablemente ya está contrayéndose.
+        """)
+
+        st.divider()
+
+        st.markdown("### 💰 Tasas Fed (proxy: Letra del Tesoro a 3 meses)")
+        st.markdown("""
+        Refleja de cerca la tasa de referencia actual de la Reserva Federal (Fed Funds Rate).
+
+        | Estado | Interpretación |
+        |--------|----------------|
+        | **💰 Acomodaticia (< 4%)** | Política expansiva. Favorece el crecimiento y los activos de riesgo. |
+        | **📊 Presión Moderada (4% – 5%)** | Política neutral a restrictiva. Encarece el crédito gradualmente. |
+        | **💸 Restrictiva (> 5%)** | Política dura. Busca enfriar la inflación, puede frenar el crecimiento. |
+        | **🚨 Caída Brusca (Pánico)** | Recorte de +0.50% en pocos meses. Generalmente reacción a un deterioro económico repentino, no buena noticia per se. |
+
+        > ⚠️ Una caída rápida de tasas no siempre es alcista para acciones — a menudo significa que la Fed está respondiendo a una crisis ya en marcha.
+        """)
+
+        st.divider()
+        st.info("💡 **Síntesis:** Curva invertida = alerta temprana. Desempleo subiendo = confirmación. Tasas cayendo de golpe = la Fed ya está reaccionando a un problema real. Los tres juntos dan el `risk_score` que ves en el panel de Monitor Macro.")
+
+        
         st.divider()
         st.info("💡 La señal más poderosa es cuando **técnico y fundamental coinciden**.")
 
@@ -431,13 +487,6 @@ if data_plan:
         st.error(f"🔴 **DETERIORO — Revisar posición:** {', '.join(alertas_venta)}")
     if alertas_compra:
         st.warning(f"🚨 **Oportunidades detectadas:** {', '.join(alertas_compra)}")
-
-    seleccion_plan = st.selectbox("🎯 Ver gráfico del plan:", df_plan["Ticker"].tolist(), key="plan_chart")
-    if seleccion_plan:
-        item_p = next(i for i in data_plan if i["Ticker"] == seleccion_plan)
-        render_chart(item_p["df"].tail(252), key_suffix="_plan")
-        st.subheader(f"📊 Radiografía Fundamental: {seleccion_plan}")
-        render_fundamental(item_p)
 
     ahora     = datetime.now()
     fecha_hoy = ahora.strftime("%Y-%m-%d")
