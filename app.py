@@ -474,7 +474,9 @@ def fetch_macro_data_direct():
         for item in bls_data['Results']['series'][0]['data']:
             year  = int(item['year'])
             month = int(item['period'].replace('M', ''))
-            val   = float(item['value'])
+            if item['value'] in ('-', '', None):
+                continue
+            val = float(item['value'])
             records.append({'date': pd.Timestamp(year=year, month=month, day=1) + pd.offsets.MonthEnd(0), 'Desempleo (%)': val})
         df_unemp = pd.DataFrame(records).set_index('date').sort_index()
 
