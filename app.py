@@ -463,6 +463,8 @@ def fetch_macro_data_direct():
         t3m  = yf.Ticker("^IRX").history(period="2y")['Close'].rename("T3M")
         t10y_m = (t10y / 10).resample('ME').last()
         t3m_m  = (t3m  / 10).resample('ME').last()
+        t10y_m.index = t10y_m.index.tz_localize(None)
+        t3m_m.index  = t3m_m.index.tz_localize(None)
         curva    = (t10y_m - t3m_m).rename('Curva 10Y-3M')
         fed_rate = t3m_m.rename('Tasas Fed (%)')
 
