@@ -524,7 +524,7 @@ if macro_data is not None:
         st.metric("Desempleo EE.UU.", f"{unemp}%", f"{round(unemp - prev['Desempleo (%)'],2)}", delta_color="inverse")
         st.markdown(f"**Estado:** {'⚠️ Subiendo' if unemp_diff >= 0.3 else '✅ Estable'}")
     with col_m3:
-        st.metric("Tasas (3M Treasury)", f"{rates}%", f"{round(-rates_drop,2)}", delta_color="inverse")
+        st.metric("Tasas (3M Treasury)", f"{round(rates,2)}%", f"{round(-rates_drop,2)}", delta_color="inverse")
         st.markdown(f"**Estado:** {status_rates}")
 
     st.divider()
