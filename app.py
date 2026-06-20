@@ -157,7 +157,10 @@ with st.expander("📖 MANUAL DE INTERPRETACIÓN: RADIOGRAFÍA TÉCNICA Y FUNDAM
             - D/E **< 100%**
             - Golden Cross
             """)
-            with tab4:
+        st.divider()
+        st.info("💡 La señal más poderosa es cuando **técnico y fundamental coinciden**.")
+
+    with tab4:
         st.markdown("## 🌍 Indicadores Macroeconómicos")
 
         st.markdown("### 📉 Curva 10Y-3M (Spread de Tasas)")
@@ -211,10 +214,6 @@ with st.expander("📖 MANUAL DE INTERPRETACIÓN: RADIOGRAFÍA TÉCNICA Y FUNDAM
 
         st.divider()
         st.info("💡 **Síntesis:** Curva invertida = alerta temprana. Desempleo subiendo = confirmación. Tasas cayendo de golpe = la Fed ya está reaccionando a un problema real. Los tres juntos dan el `risk_score` que ves en el panel de Monitor Macro.")
-
-        
-        st.divider()
-        st.info("💡 La señal más poderosa es cuando **técnico y fundamental coinciden**.")
 
 # --- SIDEBAR ---
 st.sidebar.header("⚙️ Parámetros de Ingeniería")
@@ -507,7 +506,6 @@ st.header("🌍 Monitor Macro: Radar de Recesión")
 @st.cache_data(ttl=86400)
 def fetch_macro_data_direct():
     try:
-        # Tasas desde yfinance (siempre permitido en Streamlit Cloud)
         t10y = yf.Ticker("^TNX").history(period="2y")['Close'].rename("T10Y")
         t3m  = yf.Ticker("^IRX").history(period="2y")['Close'].rename("T3M")
         t10y_m = (t10y / 10).resample('ME').last()
@@ -517,7 +515,6 @@ def fetch_macro_data_direct():
         curva    = (t10y_m - t3m_m).rename('Curva 10Y-3M')
         fed_rate = t3m_m.rename('Tasas Fed (%)')
 
-        # Desempleo desde API pública BLS (sin API key)
         bls_url = "https://api.bls.gov/publicAPI/v1/timeseries/data/LNS14000000"
         r = requests.get(bls_url, timeout=15, headers={'User-Agent': 'Mozilla/5.0'})
         bls_data = r.json()
