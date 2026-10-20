@@ -265,7 +265,7 @@ ETF_CONOCIDOS = {
 }
  
 # Fuentes oficiales de componentes (sin Wikipedia)
-URL_NASDAQ100 = "https://api.nasdaq.com/api/quote/list-type/nasdaq100")
+URL_NASDAQ100 = ("https://api.nasdaq.com/api/quote/list-type/nasdaq100")
 URL_SP500_SSGA = ("https://www.ssga.com/us/en/intermediary/library-content/products/"
                   "fund-data/etfs/us/holdings-daily-us-en-spy.xlsx")
 HEADERS_BROWSER = {
