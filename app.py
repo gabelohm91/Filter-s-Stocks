@@ -264,89 +264,252 @@ ETF_CONOCIDOS = {
     "VOO", "SCHD", "VGT", "VXUS", "VUG", "QQQ", "VT", "VYMI", "VIG", "MCHI"
 }
  
-# Fuentes oficiales de componentes (sin Wikipedia)
-URL_NASDAQ100 = ("https://api.nasdaq.com/api/quote/list-type/nasdaq100")
-URL_SP500_SSGA = ("https://www.ssga.com/us/en/intermediary/library-content/products/"
-                  "fund-data/etfs/us/holdings-daily-us-en-spy.xlsx")
+# --- FUENTES DE COMPONENTES ---
+
+URL_NASDAQ100 = (
+    "https://api.nasdaq.com/api/quote/list-type/nasdaq100"
+)
+
+URL_SP500_SSGA = (
+    "https://www.ssga.com/us/en/intermediary/library-content/"
+    "products/fund-data/etfs/us/holdings-daily-us-en-spy.xlsx"
+)
+
+URL_SP500_IVV = (
+    "https://www.ishares.com/us/products/239726/"
+    "ishares-core-sp-500-etf/1467271812596.ajax"
+    "?fileType=csv"
+    "&fileName=IVV_holdings"
+    "&dataType=fund"
+)
+
 HEADERS_BROWSER = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-                  '(KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-    'Accept': '*/*',
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 "
+        "(KHTML, like Gecko) "
+        "Chrome/124.0 Safari/537.36"
+    ),
+    "Accept": "*/*",
+    "Accept-Language": "en-US,en;q=0.9",
 }
-CORRECCIONES_TICKER = {"BRKB": "BRK-B", "BFB": "BF-B"}
- 
- 
+
+CORRECCIONES_TICKER = {
+    "BRKB": "BRK-B",
+    "BFB": "BF-B",
+}
+
+
 def _normalizar_ticker(s):
     s = str(s).strip().upper()
     s = CORRECCIONES_TICKER.get(s, s)
-    return s.replace('.', '-')
- 
- 
+    return s.replace(".", "-")
+
+
 def _tickers_nasdaq100():
-    r = requests.get(URL_NASDAQ100, headers=HEADERS_WEB, timeout=15)
+    r = requests.get(
+        URL_NASDAQ100,
+        headers=HEADERS_BROWSER,
+        timeout=15
+    )
     r.raise_for_status()
-    rows = r.json()['data']['data']['rows']
-    return [_normalizar_ticker(x['symbol']) for x in rows if x.get('symbol')]
- 
- 
+
+    respuesta = r.json()
+
+    rows = (
+        respuesta
+        .get("data", {})
+        .get("data", {})
+        .get("rows", [])
+    )
+
+    if not rows:
+        raise ValueError(
+            "La API de Nasdaq no devolvió componentes."
+        )
+
+    tickers = [
+        _normalizar_ticker(fila["symbol"])
+        for fila in rows
+        if fila.get("symbol")
+    ]
+
+    if len(tickers) < 90:
+        raise ValueError(
+            f"Nasdaq devolvió solamente {len(tickers)} tickers."
+        )
+
+    return tickers
+
+
 def _tickers_sp500_ssga():
-    r = requests.get(URL_SP500_SSGA, headers=HEADERS_BROWSER, timeout=30)
+    r = requests.get(
+        URL_SP500_SSGA,
+        headers=HEADERS_BROWSER,
+        timeout=30
+    )
     r.raise_for_status()
-    if b'<html' in r.content[:600].lower():
-        raise ValueError("devolvió HTML en vez de Excel")
-    raw = pd.read_excel(BytesIO(r.content), header=None)
-    fila = next(i for i in range(min(len(raw), 30))
-                if "Ticker" in raw.iloc[i].astype(str).tolist())
-    df = raw.iloc[fila + 1:].copy()
-    df.columns = raw.iloc[fila].astype(str).tolist()
-    tks = [str(t).strip() for t in df['Ticker'].dropna()]
-    tks = [t for t in tks if t.replace('.', '').replace('-', '').isalpha() and len(t) <= 6]
-    if len(tks) < 400:
-        raise ValueError(f"solo {len(tks)} tickers válidos")
-    return [_normalizar_ticker(t) for t in tks]
+
+    if b"<html" in r.content[:600].lower():
+        raise ValueError(
+            "SSGA devolvió HTML en vez del archivo Excel."
+        )
+
+    raw = pd.read_excel(
+        BytesIO(r.content),
+        header=None
+    )
+
+    fila_encabezado = next(
+        (
+            i
+            for i in range(min(len(raw), 30))
+            if "Ticker" in raw.iloc[i].astype(str).tolist()
+        ),
+        None
+    )
+
+    if fila_encabezado is None:
+        raise ValueError(
+            "No se encontró el encabezado Ticker."
+        )
+
+    df = raw.iloc[fila_encabezado + 1:].copy()
+    df.columns = raw.iloc[fila_encabezado].astype(str).tolist()
+
+    tickers = [
+        str(ticker).strip()
+        for ticker in df["Ticker"].dropna()
+    ]
+
+    tickers = [
+        ticker
+        for ticker in tickers
+        if ticker.replace(".", "").replace("-", "").isalpha()
+        and len(ticker) <= 6
+    ]
+
+    if len(tickers) < 400:
+        raise ValueError(
+            f"SSGA devolvió solamente {len(tickers)} tickers válidos."
+        )
+
+    return [
+        _normalizar_ticker(ticker)
+        for ticker in tickers
+    ]
 
 
 def _tickers_sp500_ishares():
-    r = requests.get(URL_SP500_IVV, headers=HEADERS_BROWSER, timeout=20)
+    r = requests.get(
+        URL_SP500_IVV,
+        headers=HEADERS_BROWSER,
+        timeout=30
+    )
     r.raise_for_status()
-    lineas = [l.lstrip('\ufeff') for l in r.text.splitlines()]
-    inicio = next((i for i, l in enumerate(lineas)
-                   if l.replace('"', '').startswith("Ticker,")), None)
+
+    lineas = [
+        linea.lstrip("\ufeff")
+        for linea in r.text.splitlines()
+    ]
+
+    inicio = next(
+        (
+            i
+            for i, linea in enumerate(lineas)
+            if linea.replace('"', "").startswith("Ticker,")
+        ),
+        None
+    )
+
     if inicio is None:
-        raise ValueError("devolvió HTML/sin encabezado")
-    df = pd.read_csv(StringIO("\n".join(lineas[inicio:])))
-    df = df[df['Asset Class'] == 'Equity']
-    return [_normalizar_ticker(t) for t in df['Ticker'].dropna().tolist()
-            if str(t).strip() not in ('-', '')]
+        raise ValueError(
+            "iShares devolvió HTML o no incluyó el encabezado."
+        )
+
+    df = pd.read_csv(
+        StringIO("\n".join(lineas[inicio:]))
+    )
+
+    if "Asset Class" in df.columns:
+        df = df[df["Asset Class"] == "Equity"]
+
+    tickers = [
+        _normalizar_ticker(ticker)
+        for ticker in df["Ticker"].dropna().tolist()
+        if str(ticker).strip() not in ("", "-")
+    ]
+
+    if len(tickers) < 400:
+        raise ValueError(
+            f"iShares devolvió solamente {len(tickers)} tickers válidos."
+        )
+
+    return tickers
 
 
 def _tickers_sp500():
     errores = []
-    for nombre, fn in (("SSGA/SPY", _tickers_sp500_ssga), ("iShares/IVV", _tickers_sp500_ishares)):
+
+    fuentes = (
+        ("SSGA/SPY", _tickers_sp500_ssga),
+        ("iShares/IVV", _tickers_sp500_ishares),
+    )
+
+    for nombre, funcion in fuentes:
         try:
-            return fn()
+            tickers = funcion()
+            return tickers
         except Exception as e:
-            errores.append(f"{nombre}: {type(e).__name__}: {e}")
+            errores.append(
+                f"{nombre}: {type(e).__name__}: {e}"
+            )
+
     raise RuntimeError(" || ".join(errores))
- 
- 
+
+
 @st.cache_data(ttl=86400)
 def get_all_tickers():
-    """Devuelve (lista_de_tickers, mensaje_de_estado)."""
-    fuentes_ok, fallos = [], []
+    fuentes_ok = []
+    fallos = []
+
     tickers = list(MIS_ACTIVOS_FIJOS)
-    for nombre, fn in (("S&P 500 (iShares)", _tickers_sp500), ("Nasdaq-100 (Nasdaq)", _tickers_nasdaq100)):
+
+    fuentes = (
+        ("S&P 500", _tickers_sp500),
+        ("Nasdaq-100", _tickers_nasdaq100),
+    )
+
+    for nombre, funcion in fuentes:
         try:
-            tickers += fn()
-            fuentes_ok.append(nombre)
+            nuevos_tickers = funcion()
+            tickers.extend(nuevos_tickers)
+            fuentes_ok.append(
+                f"{nombre}: {len(nuevos_tickers)}"
+            )
         except Exception as e:
-            fallos.append(f"{nombre}: {e}")
-    tickers = sorted(set(_normalizar_ticker(t) for t in tickers))
-    msg = ""
+            fallos.append(
+                f"{nombre}: {type(e).__name__}: {e}"
+            )
+
+    tickers = sorted(
+        set(
+            _normalizar_ticker(ticker)
+            for ticker in tickers
+        )
+    )
+
+    mensajes = []
+
+    if fuentes_ok:
+        mensajes.append(
+            "Fuentes cargadas: " + " | ".join(fuentes_ok)
+        )
+
     if fallos:
-        msg = "No se pudo cargar: " + " | ".join(fallos) + ". Se usan solo los activos disponibles."
-    return tickers, msg
- 
+        mensajes.append(
+            "Fuentes no disponibles: " + " | ".join(fallos)
+        )
  
 @st.cache_data(ttl=3600)
 def fetch_full_data(ticker):
