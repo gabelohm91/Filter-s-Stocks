@@ -470,46 +470,22 @@ def _tickers_sp500():
 
 @st.cache_data(ttl=86400)
 def get_all_tickers():
-    fuentes_ok = []
-    fallos = []
-
+    """Devuelve (lista_de_tickers, mensaje_de_estado)."""
+    fuentes_ok, fallos = [], []
     tickers = list(MIS_ACTIVOS_FIJOS)
-
-    fuentes = (
-        ("S&P 500", _tickers_sp500),
-        ("Nasdaq-100", _tickers_nasdaq100),
-    )
-
-    for nombre, funcion in fuentes:
+    for nombre, fn in (("S&P 500 (iShares)", _tickers_sp500), ("Nasdaq-100 (Nasdaq)", _tickers_nasdaq100)):
         try:
-            nuevos_tickers = funcion()
-            tickers.extend(nuevos_tickers)
-            fuentes_ok.append(
-                f"{nombre}: {len(nuevos_tickers)}"
-            )
+            tickers += fn()
+            fuentes_ok.append(nombre)
         except Exception as e:
-            fallos.append(
-                f"{nombre}: {type(e).__name__}: {e}"
-            )
-
-    tickers = sorted(
-        set(
-            _normalizar_ticker(ticker)
-            for ticker in tickers
-        )
-    )
-
-    mensajes = []
-
-    if fuentes_ok:
-        mensajes.append(
-            "Fuentes cargadas: " + " | ".join(fuentes_ok)
-        )
-
+            fallos.append(f"{nombre}: {e}")
+    tickers = sorted(set(_normalizar_ticker(t) for t in tickers))
+    msg = ""
     if fallos:
-        mensajes.append(
-            "Fuentes no disponibles: " + " | ".join(fallos)
-        )
+        msg = "No se pudo cargar: " + " | ".join(fallos) + ". Se usan solo los activos disponibles."
+    return tickers, msg
+ 
+ 
  
 @st.cache_data(ttl=3600)
 def fetch_full_data(ticker):
