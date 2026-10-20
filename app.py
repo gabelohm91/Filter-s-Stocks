@@ -265,7 +265,8 @@ ETF_CONOCIDOS = {
 }
  
 # Fuentes oficiales de componentes (sin Wikipedia)
-URL_NASDAQ100 = "https://api.nasdaq.com/api/quote/list-type/nasdaq100"
+URL_NASDAQ100 = ("https://api.nasdaq.com/api/quote/list-type/nasdaq100")
+HEADERS_WEB = {'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json, text/csv, */*'}
 URL_SP500_SSGA = ("https://www.ssga.com/us/en/intermediary/library-content/products/"
                   "fund-data/etfs/us/holdings-daily-us-en-spy.xlsx")
 HEADERS_BROWSER = {
@@ -273,7 +274,7 @@ HEADERS_BROWSER = {
                   '(KHTML, like Gecko) Chrome/124.0 Safari/537.36',
     'Accept': '*/*',
 }
-HEADERS_WEB = {'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json, text/csv, */*'}
+
 CORRECCIONES_TICKER = {"BRKB": "BRK-B", "BFB": "BF-B"}
  
  
