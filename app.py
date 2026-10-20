@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime
 import requests
-from io import StringIO
+from io import StringIO, BytesIO
  
 st.set_page_config(page_title="Terminal Pro - Gabriel Herrera", layout="wide")
  
@@ -266,9 +266,13 @@ ETF_CONOCIDOS = {
  
 # Fuentes oficiales de componentes (sin Wikipedia)
 URL_NASDAQ100 = "https://api.nasdaq.com/api/quote/list-type/nasdaq100"
-URL_SP500_IVV = ("https://www.ishares.com/us/products/239726/ishares-core-sp-500-etf/"
-                 "1467271812596.ajax?fileType=csv&fileName=IVV_holdings&dataType=fund")
-HEADERS_WEB = {'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json, text/csv, */*'}
+URL_SP500_SSGA = ("https://www.ssga.com/us/en/intermediary/library-content/products/"
+                  "fund-data/etfs/us/holdings-daily-us-en-spy.xlsx")
+HEADERS_BROWSER = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                  '(KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+    'Accept': '*/*',
+}
 CORRECCIONES_TICKER = {"BRKB": "BRK-B", "BFB": "BF-B"}
  
  
@@ -285,18 +289,45 @@ def _tickers_nasdaq100():
     return [_normalizar_ticker(x['symbol']) for x in rows if x.get('symbol')]
  
  
-def _tickers_sp500():
-    r = requests.get(URL_SP500_IVV, headers=HEADERS_WEB, timeout=20)
+def _tickers_sp500_ssga():
+    r = requests.get(URL_SP500_SSGA, headers=HEADERS_BROWSER, timeout=30)
+    r.raise_for_status()
+    if b'<html' in r.content[:600].lower():
+        raise ValueError("devolvió HTML en vez de Excel")
+    raw = pd.read_excel(BytesIO(r.content), header=None)
+    fila = next(i for i in range(min(len(raw), 30))
+                if "Ticker" in raw.iloc[i].astype(str).tolist())
+    df = raw.iloc[fila + 1:].copy()
+    df.columns = raw.iloc[fila].astype(str).tolist()
+    tks = [str(t).strip() for t in df['Ticker'].dropna()]
+    tks = [t for t in tks if t.replace('.', '').replace('-', '').isalpha() and len(t) <= 6]
+    if len(tks) < 400:
+        raise ValueError(f"solo {len(tks)} tickers válidos")
+    return [_normalizar_ticker(t) for t in tks]
+
+
+def _tickers_sp500_ishares():
+    r = requests.get(URL_SP500_IVV, headers=HEADERS_BROWSER, timeout=20)
     r.raise_for_status()
     lineas = [l.lstrip('\ufeff') for l in r.text.splitlines()]
     inicio = next((i for i, l in enumerate(lineas)
                    if l.replace('"', '').startswith("Ticker,")), None)
     if inicio is None:
-        raise ValueError(f"Encabezado no encontrado. Primeras líneas: {lineas[:12]}")
+        raise ValueError("devolvió HTML/sin encabezado")
     df = pd.read_csv(StringIO("\n".join(lineas[inicio:])))
     df = df[df['Asset Class'] == 'Equity']
     return [_normalizar_ticker(t) for t in df['Ticker'].dropna().tolist()
             if str(t).strip() not in ('-', '')]
+
+
+def _tickers_sp500():
+    errores = []
+    for nombre, fn in (("SSGA/SPY", _tickers_sp500_ssga), ("iShares/IVV", _tickers_sp500_ishares)):
+        try:
+            return fn()
+        except Exception as e:
+            errores.append(f"{nombre}: {type(e).__name__}: {e}")
+    raise RuntimeError(" || ".join(errores))
  
  
 @st.cache_data(ttl=86400)
