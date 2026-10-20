@@ -288,11 +288,15 @@ def _tickers_nasdaq100():
 def _tickers_sp500():
     r = requests.get(URL_SP500_IVV, headers=HEADERS_WEB, timeout=20)
     r.raise_for_status()
-    lineas = r.text.splitlines()
-    inicio = next(i for i, l in enumerate(lineas) if l.startswith("Ticker,"))
+    lineas = [l.lstrip('\ufeff') for l in r.text.splitlines()]
+    inicio = next((i for i, l in enumerate(lineas)
+                   if l.replace('"', '').startswith("Ticker,")), None)
+    if inicio is None:
+        raise ValueError(f"Encabezado no encontrado. Primeras líneas: {lineas[:12]}")
     df = pd.read_csv(StringIO("\n".join(lineas[inicio:])))
     df = df[df['Asset Class'] == 'Equity']
-    return [_normalizar_ticker(t) for t in df['Ticker'].dropna().tolist() if str(t).strip() not in ('-', '')]
+    return [_normalizar_ticker(t) for t in df['Ticker'].dropna().tolist()
+            if str(t).strip() not in ('-', '')]
  
  
 @st.cache_data(ttl=86400)
